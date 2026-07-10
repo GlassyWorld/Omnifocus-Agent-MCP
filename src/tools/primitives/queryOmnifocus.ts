@@ -15,6 +15,8 @@ export interface QueryOmnifocusParams {
   filters?: {
     projectId?: string;
     projectName?: string;
+    taskId?: string;
+    taskNameExact?: string;
     taskName?: string;
     folderId?: string;
     tags?: string[];
@@ -285,6 +287,20 @@ function generateFilterConditions(entity: string, filters: any): string {
       conditions.push(`
         const taskName = (item.name || "").toLowerCase();
         if (!taskName.includes("${safeName}")) return false;
+      `);
+    }
+
+    if (filters.taskNameExact) {
+      const safeName = escapeJXA(filters.taskNameExact);
+      conditions.push(`
+        if ((item.name || "") !== "${safeName}") return false;
+      `);
+    }
+
+    if (filters.taskId) {
+      const safeId = escapeJXA(filters.taskId);
+      conditions.push(`
+        if (item.id.primaryKey !== "${safeId}") return false;
       `);
     }
 
@@ -619,6 +635,10 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
       return entity === 'projects'
         ? `id: item.task.id.primaryKey`
         : `id: item.id.primaryKey`;
+    } else if (field === 'name') {
+      return `name: item.name || ""`;
+    } else if (field === 'flagged') {
+      return `flagged: Boolean(item.flagged)`;
     } else if (field === 'taskStatus') {
       return `taskStatus: taskStatusMap[item.taskStatus]`;
     } else if (field === 'status') {
@@ -629,6 +649,10 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
       return `creationDate: formatDate(item.added)`;
     } else if (field === 'completionDate') {
       return `completionDate: item.completionDate ? formatDate(item.completionDate) : null`;
+    } else if (field === 'completed') {
+      return `completed: Boolean(item.completed)`;
+    } else if (field === 'effectiveCompletedDate') {
+      return `effectiveCompletedDate: item.effectiveCompletedDate ? formatDate(item.effectiveCompletedDate) : null`;
     } else if (field === 'dropDate') {
       return `dropDate: item.dropDate ? formatDate(item.dropDate) : null`;
     } else if (field === 'effectiveDropDate') {
@@ -653,12 +677,18 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
       return `projectName: item.containingProject ? item.containingProject.name : (item.inInbox ? "Inbox" : null)`;
     } else if (field === 'projectId') {
       return `projectId: item.containingProject ? item.containingProject.task.id.primaryKey : null`;
+    } else if (field === 'inInbox') {
+      return `inInbox: Boolean(item.inInbox)`;
+    } else if (field === 'isProjectRoot') {
+      return `isProjectRoot: item.project !== null`;
     } else if (field === 'parentId') {
       return `parentId: item.parent ? item.parent.id.primaryKey : null`;
     } else if (field === 'childIds') {
       return `childIds: item.children ? item.children.map(c => c.id.primaryKey) : []`;
     } else if (field === 'hasChildren') {
-      return `hasChildren: item.children ? item.children.length > 0 : false`;
+      return `hasChildren: Boolean(item.hasChildren)`;
+    } else if (field === 'completedByChildren') {
+      return `completedByChildren: Boolean(item.completedByChildren)`;
     } else if (field === 'folderName') {
       return `folderName: item.parentFolder ? item.parentFolder.name : null`;
     } else if (field === 'folderID') {
@@ -685,6 +715,8 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
       return `sequential: Boolean(item.sequential)`;
     } else if (field === 'estimatedMinutes') {
       return `estimatedMinutes: item.estimatedMinutes || null`;
+    } else if (field === 'effectiveFlagged') {
+      return `effectiveFlagged: Boolean(item.effectiveFlagged)`;
     } else if (field === 'nextReviewDate') {
       return `nextReviewDate: formatDate(item.nextReviewDate)`;
     } else if (field === 'reviewInterval') {

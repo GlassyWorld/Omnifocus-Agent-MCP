@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { _testExports as primitives } from '../primitives/queryOmnifocus.js';
 import { _testExports as definitions } from '../definitions/queryOmnifocus.js';
+import { GET_TASK_RAW_FIELDS } from '../primitives/getTask.js';
 
 const { escapeJXA, generateFilterConditions, generateFieldMapping } = primitives;
 const { formatTasks, formatProjects, formatFolders, formatFilters } = definitions;
@@ -66,6 +67,18 @@ describe('generateFilterConditions - taskName', () => {
     const returnFalseCount = (result.match(/return false/g) || []).length;
     expect(returnFalseCount).toBeGreaterThanOrEqual(2);
   });
+
+  it('generates case-sensitive exact equality for taskNameExact', () => {
+    const result = generateFilterConditions('tasks', { taskNameExact: 'Email' });
+    expect(result).toContain('(item.name || "") !== "Email"');
+    expect(result).not.toContain('.toLowerCase()');
+    expect(result).not.toContain('.includes');
+  });
+
+  it('generates exact id equality for taskId', () => {
+    const result = generateFilterConditions('tasks', { taskId: 'abc123' });
+    expect(result).toContain('item.id.primaryKey !== "abc123"');
+  });
 });
 
 // ============================================================
@@ -117,7 +130,7 @@ describe('generateFieldMapping - hierarchy fields', () => {
   it('includes hasChildren mapping when requested', () => {
     const result = generateFieldMapping('tasks', ['hasChildren']);
     expect(result).toContain('hasChildren');
-    expect(result).toContain('item.children');
+    expect(result).toContain('Boolean(item.hasChildren)');
   });
 
   it('default task fields do NOT include hierarchy (keeps response small)', () => {
@@ -133,6 +146,39 @@ describe('generateFieldMapping - hierarchy fields', () => {
     expect(result).toContain('name');
     expect(result).toContain('parentId');
     expect(result).toContain('childIds');
+  });
+});
+
+// ============================================================
+// generateFieldMapping - get_task raw fields
+// ============================================================
+describe('generateFieldMapping - get_task raw fields', () => {
+  it('has explicit mappings for every GET_TASK_RAW_FIELDS entry', () => {
+    for (const field of GET_TASK_RAW_FIELDS) {
+      const result = generateFieldMapping('tasks', [field]);
+      expect(result).not.toContain(`${field}: item.${field} !== undefined`);
+    }
+  });
+
+  it('maps get_task-specific fields explicitly', () => {
+    const result = generateFieldMapping('tasks', [
+      'name',
+      'flagged',
+      'completed',
+      'effectiveCompletedDate',
+      'effectiveFlagged',
+      'inInbox',
+      'completedByChildren',
+      'isProjectRoot',
+    ]);
+    expect(result).toContain('name: item.name || ""');
+    expect(result).toContain('flagged: Boolean(item.flagged)');
+    expect(result).toContain('completed: Boolean(item.completed)');
+    expect(result).toContain('effectiveCompletedDate: item.effectiveCompletedDate ? formatDate(item.effectiveCompletedDate) : null');
+    expect(result).toContain('effectiveFlagged: Boolean(item.effectiveFlagged)');
+    expect(result).toContain('inInbox: Boolean(item.inInbox)');
+    expect(result).toContain('completedByChildren: Boolean(item.completedByChildren)');
+    expect(result).toContain('isProjectRoot: item.project !== null');
   });
 });
 

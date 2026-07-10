@@ -17,6 +17,7 @@ import * as editItemTool from './tools/definitions/editItem.js';
 import * as batchAddItemsTool from './tools/definitions/batchAddItems.js';
 import * as batchRemoveItemsTool from './tools/definitions/batchRemoveItems.js';
 import * as queryOmniFocusTool from './tools/definitions/queryOmnifocus.js';
+import * as getTaskTool from './tools/definitions/getTask.js';
 import * as listPerspectivesTool from './tools/definitions/listPerspectives.js';
 import * as getPerspectiveViewTool from './tools/definitions/getPerspectiveView.js';
 import * as listTagsTool from './tools/definitions/listTags.js';
@@ -131,6 +132,13 @@ server.tool(
   "Efficiently query OmniFocus database with powerful filters. Get specific tasks, projects, or folders without loading the entire database. Supports filtering by project, tags, status, due dates, and more. Much faster than dump_database for targeted queries.",
   queryOmniFocusTool.schema.shape,
   queryOmniFocusTool.handler
+);
+
+server.tool(
+  "get_task",
+  "Read-only. Get one exact OmniFocus task by ID or exact name.",
+  getTaskTool.schema.shape,
+  getTaskTool.handler
 );
 
 server.tool(

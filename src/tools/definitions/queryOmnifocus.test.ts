@@ -51,4 +51,18 @@ describe('queryOmnifocus schema', () => {
       expect(result.success).toBe(false);
     });
   });
+
+  describe('task exact lookup filters', () => {
+    it('accepts taskId', () => {
+      const input = { entity: 'tasks', filters: { taskId: 'abc123' } };
+      const result = schema.safeParse(input);
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts taskNameExact', () => {
+      const input = { entity: 'tasks', filters: { taskNameExact: 'Exact Task Name' } };
+      const result = schema.safeParse(input);
+      expect(result.success).toBe(true);
+    });
+  });
 });
