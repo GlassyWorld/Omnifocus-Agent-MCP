@@ -1,6 +1,8 @@
 import { RawTask, TaskKind } from './taskTypes.js';
 
-export function classifyTaskKind(raw: RawTask): TaskKind {
+export type TaskKindFacts = Pick<RawTask, 'isProjectRoot' | 'hasChildren'>;
+
+export function classifyTaskKind(raw: TaskKindFacts): TaskKind {
   if (raw.isProjectRoot) {
     return "project_root";
   }

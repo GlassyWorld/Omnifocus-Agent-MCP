@@ -1,5 +1,7 @@
 import { ProjectKind, RawProject } from './projectTypes.js';
 
-export function classifyProjectKind(raw: RawProject): ProjectKind {
+export type ProjectKindFacts = Pick<RawProject, 'containsSingletonActions'>;
+
+export function classifyProjectKind(raw: ProjectKindFacts): ProjectKind {
   return raw.containsSingletonActions ? "single_actions" : "standard";
 }

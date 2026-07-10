@@ -16,6 +16,14 @@ export type ProjectTaskStatusCounts = {
   dropped: number;
 };
 
+export type ProjectStatusSemantics = {
+  raw: string;
+  active: boolean;
+  onHold: boolean;
+  completed: boolean;
+  dropped: boolean;
+};
+
 export type QueryProjectItem = Record<string, unknown>;
 
 export type RawProject = {
@@ -45,13 +53,7 @@ export type ProjectView = {
   name: string;
   note: string;
   kind: ProjectKind;
-  status: {
-    raw: string;
-    active: boolean;
-    onHold: boolean;
-    completed: boolean;
-    dropped: boolean;
-  };
+  status: ProjectStatusSemantics;
   sequential: boolean;
   flagged: boolean;
   completedByChildren: boolean;

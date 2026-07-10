@@ -20,6 +20,8 @@ export type FlagSemantics = {
   source: StatusSource;
 };
 
+export type FlagFacts = Pick<RawTask, 'flagged' | 'effectiveFlagged'>;
+
 export function classifyCompletion(raw: RawTask): CompletionSemantics {
   if (raw.completed || raw.completionDate) {
     return {
@@ -74,7 +76,7 @@ export function classifyDrop(raw: RawTask): DropSemantics {
   };
 }
 
-export function classifyFlag(raw: RawTask): FlagSemantics {
+export function classifyFlag(raw: FlagFacts): FlagSemantics {
   if (raw.flagged) {
     return {
       direct: true,

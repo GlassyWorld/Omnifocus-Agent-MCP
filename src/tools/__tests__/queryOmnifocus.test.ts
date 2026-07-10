@@ -4,6 +4,10 @@ import { _testExports as definitions } from '../definitions/queryOmnifocus.js';
 import { GET_TASK_RAW_FIELDS } from '../primitives/getTask.js';
 import { GET_PROJECT_RAW_FIELDS } from '../primitives/getProject.js';
 import { GET_COMPLETED_TASK_RAW_FIELDS } from '../primitives/getCompletedSince.js';
+import {
+  GET_LEAN_PROJECT_RAW_FIELDS,
+  GET_LEAN_TASK_RAW_FIELDS,
+} from '../primitives/getLeanSnapshot.js';
 
 const { escapeJXA, generateFilterConditions, generateFieldMapping } = primitives;
 const { formatTasks, formatProjects, formatFolders, formatFilters } = definitions;
@@ -248,6 +252,50 @@ describe('generateFieldMapping - get_completed_since raw fields', () => {
     for (const field of GET_COMPLETED_TASK_RAW_FIELDS) {
       const result = generateFieldMapping('tasks', [field]);
       expect(result).not.toContain(`${field}: item.${field} !== undefined`);
+    }
+  });
+});
+
+describe('generateFieldMapping - get_lean_snapshot raw fields', () => {
+  it.each([
+    ['', false],
+    ['   ', false],
+    ['Snapshot context', true],
+  ])('maps task hasNote from %j to %s', (note, expected) => {
+    const mapping = generateFieldMapping('tasks', ['hasNote']);
+    const result = new Function('item', mapping)({ note });
+    expect(result).toEqual({ hasNote: expected });
+  });
+
+  it.each([
+    ['', false],
+    ['\n\t', false],
+    ['Project context', true],
+  ])('maps project hasNote from %j to %s', (note, expected) => {
+    const mapping = generateFieldMapping('projects', ['hasNote']);
+    const result = new Function('item', mapping)({ note });
+    expect(result).toEqual({ hasNote: expected });
+  });
+
+  it('maps totalTaskCount from flattenedTasks length', () => {
+    const mapping = generateFieldMapping('projects', ['totalTaskCount']);
+    const result = new Function('item', mapping)({ flattenedTasks: [{}, {}, {}] });
+    expect(result).toEqual({ totalTaskCount: 3 });
+  });
+
+  it('maps missing flattenedTasks to zero totalTaskCount', () => {
+    const mapping = generateFieldMapping('projects', ['totalTaskCount']);
+    const result = new Function('item', mapping)({});
+    expect(result).toEqual({ totalTaskCount: 0 });
+  });
+
+  it.each([
+    ['tasks', GET_LEAN_TASK_RAW_FIELDS],
+    ['projects', GET_LEAN_PROJECT_RAW_FIELDS],
+  ] as const)('has explicit mappings for every %s Snapshot Raw field', (entity, fields) => {
+    for (const field of fields) {
+      const mapping = generateFieldMapping(entity, [field]);
+      expect(mapping).not.toContain(`${field}: item.${field} !== undefined`);
     }
   });
 });

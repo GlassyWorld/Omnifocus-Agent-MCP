@@ -667,6 +667,8 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
         : `id: item.id.primaryKey`;
     } else if (field === 'name') {
       return `name: item.name || ""`;
+    } else if (field === 'hasNote') {
+      return `hasNote: typeof item.note === "string" ? item.note.trim().length > 0 : Boolean(item.note && String(item.note).trim().length > 0)`;
     } else if (field === 'flagged') {
       return `flagged: Boolean(item.flagged)`;
     } else if (field === 'taskStatus') {
@@ -754,6 +756,8 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
             });
             return counts;
           })()`;
+    } else if (field === 'totalTaskCount' && entity === 'projects') {
+      return `totalTaskCount: item.flattenedTasks ? item.flattenedTasks.length : 0`;
     } else if (field === 'taskCount') {
       return `taskCount: item.tasks ? item.tasks.length : 0`;
     } else if (field === 'tasks') {

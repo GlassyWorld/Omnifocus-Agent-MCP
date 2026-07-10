@@ -20,6 +20,7 @@ import * as queryOmniFocusTool from './tools/definitions/queryOmnifocus.js';
 import * as getTaskTool from './tools/definitions/getTask.js';
 import * as getProjectTool from './tools/definitions/getProject.js';
 import * as getCompletedSinceTool from './tools/definitions/getCompletedSince.js';
+import * as getLeanSnapshotTool from './tools/definitions/getLeanSnapshot.js';
 import * as listPerspectivesTool from './tools/definitions/listPerspectives.js';
 import * as getPerspectiveViewTool from './tools/definitions/getPerspectiveView.js';
 import * as listTagsTool from './tools/definitions/listTags.js';
@@ -155,6 +156,13 @@ server.tool(
   "Read-only. Return directly completed OmniFocus actions and action groups within an inclusive absolute time range. Project root completion events are excluded.",
   getCompletedSinceTool.schema.shape,
   getCompletedSinceTool.handler
+);
+
+server.tool(
+  "get_lean_snapshot",
+  "Read-only. Return a capped all-system current-state OmniFocus snapshot containing active project summaries, factual attention signals, and Inbox task summaries. Waiting, recent completion history, health, risk, priority, and recommendations are not inferred.",
+  getLeanSnapshotTool.schema.shape,
+  getLeanSnapshotTool.handler
 );
 
 server.tool(

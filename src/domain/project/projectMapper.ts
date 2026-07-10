@@ -1,5 +1,6 @@
 import { classifyProjectKind } from './projectClassifier.js';
 import { classifyProjectDate } from './projectDateSemantics.js';
+import { classifyProjectStatus } from './projectStatusSemantics.js';
 import { ProjectView, RawProject } from './projectTypes.js';
 
 export function mapRawProjectToProjectView(raw: RawProject): ProjectView {
@@ -8,13 +9,7 @@ export function mapRawProjectToProjectView(raw: RawProject): ProjectView {
     name: raw.name,
     note: raw.note,
     kind: classifyProjectKind(raw),
-    status: {
-      raw: raw.status,
-      active: raw.status === 'Active',
-      onHold: raw.status === 'OnHold',
-      completed: raw.status === 'Done',
-      dropped: raw.status === 'Dropped',
-    },
+    status: classifyProjectStatus(raw.status),
     sequential: raw.sequential,
     flagged: raw.flagged,
     completedByChildren: raw.completedByChildren,
