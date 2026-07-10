@@ -19,6 +19,7 @@ import * as batchRemoveItemsTool from './tools/definitions/batchRemoveItems.js';
 import * as queryOmniFocusTool from './tools/definitions/queryOmnifocus.js';
 import * as getTaskTool from './tools/definitions/getTask.js';
 import * as getProjectTool from './tools/definitions/getProject.js';
+import * as getCompletedSinceTool from './tools/definitions/getCompletedSince.js';
 import * as listPerspectivesTool from './tools/definitions/listPerspectives.js';
 import * as getPerspectiveViewTool from './tools/definitions/getPerspectiveView.js';
 import * as listTagsTool from './tools/definitions/listTags.js';
@@ -147,6 +148,13 @@ server.tool(
   "Read-only. Get one exact OmniFocus project by canonical ID or exact name.",
   getProjectTool.schema.shape,
   getProjectTool.handler
+);
+
+server.tool(
+  "get_completed_since",
+  "Read-only. Return directly completed OmniFocus actions and action groups within an inclusive absolute time range. Project root completion events are excluded.",
+  getCompletedSinceTool.schema.shape,
+  getCompletedSinceTool.handler
 );
 
 server.tool(

@@ -36,6 +36,8 @@ export interface QueryOmnifocusParams {
     isRepeating?: boolean;
     completedWithin?: number;
     completedOn?: number;
+    completedSince?: string;
+    completedUntil?: string;
     droppedWithin?: number;
     droppedOn?: number;
     reviewDue?: boolean;
@@ -414,6 +416,26 @@ function generateFilterConditions(entity: string, filters: any): string {
 
     if (filters.completedOn !== undefined) {
       conditions.push(`if (!checkSameDay(item.completionDate, ${filters.completedOn})) return false;`);
+    }
+
+    if (filters.completedSince !== undefined) {
+      const safeCompletedSince = escapeJXA(filters.completedSince);
+      conditions.push(`
+        {
+          const completedSince = new Date("${safeCompletedSince}");
+          if (!item.completionDate || item.completionDate < completedSince) return false;
+        }
+      `);
+    }
+
+    if (filters.completedUntil !== undefined) {
+      const safeCompletedUntil = escapeJXA(filters.completedUntil);
+      conditions.push(`
+        {
+          const completedUntil = new Date("${safeCompletedUntil}");
+          if (!item.completionDate || item.completionDate > completedUntil) return false;
+        }
+      `);
     }
 
     if (filters.droppedWithin !== undefined) {

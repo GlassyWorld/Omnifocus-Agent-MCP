@@ -3,6 +3,7 @@ import { _testExports as primitives } from '../primitives/queryOmnifocus.js';
 import { _testExports as definitions } from '../definitions/queryOmnifocus.js';
 import { GET_TASK_RAW_FIELDS } from '../primitives/getTask.js';
 import { GET_PROJECT_RAW_FIELDS } from '../primitives/getProject.js';
+import { GET_COMPLETED_TASK_RAW_FIELDS } from '../primitives/getCompletedSince.js';
 
 const { escapeJXA, generateFilterConditions, generateFieldMapping } = primitives;
 const { formatTasks, formatProjects, formatFolders, formatFilters } = definitions;
@@ -79,6 +80,62 @@ describe('generateFilterConditions - taskName', () => {
   it('generates exact id equality for taskId', () => {
     const result = generateFilterConditions('tasks', { taskId: 'abc123' });
     expect(result).toContain('item.id.primaryKey !== "abc123"');
+  });
+});
+
+// ============================================================
+// generateFilterConditions - absolute completion range
+// ============================================================
+describe('generateFilterConditions - absolute completion range', () => {
+  it('generates an inclusive completedSince lower bound', () => {
+    const result = generateFilterConditions('tasks', {
+      completedSince: '2026-07-01T00:00:00.000Z',
+    });
+    expect(result).toContain('item.completionDate < completedSince');
+    expect(result).toContain('new Date("2026-07-01T00:00:00.000Z")');
+  });
+
+  it('generates an inclusive completedUntil upper bound', () => {
+    const result = generateFilterConditions('tasks', {
+      completedUntil: '2026-07-02T00:00:00.000Z',
+    });
+    expect(result).toContain('item.completionDate > completedUntil');
+    expect(result).toContain('new Date("2026-07-02T00:00:00.000Z")');
+  });
+
+  it('combines both inclusive completion bounds', () => {
+    const result = generateFilterConditions('tasks', {
+      completedSince: '2026-07-01T00:00:00.000Z',
+      completedUntil: '2026-07-02T00:00:00.000Z',
+    });
+    expect(result).toContain('item.completionDate < completedSince');
+    expect(result).toContain('item.completionDate > completedUntil');
+  });
+
+  it('uses only completionDate as the event range source', () => {
+    const result = generateFilterConditions('tasks', {
+      completedSince: '2026-07-01T00:00:00.000Z',
+      completedUntil: '2026-07-02T00:00:00.000Z',
+    });
+    expect(result).not.toContain('item.modified');
+    expect(result).not.toContain('item.taskStatus');
+    expect(result).not.toContain('item.effectiveCompletedDate');
+  });
+
+  it('escapes completion range strings before embedding', () => {
+    const result = generateFilterConditions('tasks', {
+      completedSince: '2026-07-01T00:00:00.000Z"bad',
+    });
+    expect(result).toContain('2026-07-01T00:00:00.000Z\\"bad');
+  });
+
+  it('does not apply completion range filters to projects', () => {
+    const result = generateFilterConditions('projects', {
+      completedSince: '2026-07-01T00:00:00.000Z',
+      completedUntil: '2026-07-02T00:00:00.000Z',
+    });
+    expect(result).not.toContain('completedSince');
+    expect(result).not.toContain('completedUntil');
   });
 });
 
@@ -180,6 +237,18 @@ describe('generateFieldMapping - get_task raw fields', () => {
     expect(result).toContain('inInbox: Boolean(item.inInbox)');
     expect(result).toContain('completedByChildren: Boolean(item.completedByChildren)');
     expect(result).toContain('isProjectRoot: item.project !== null');
+  });
+});
+
+// ============================================================
+// generateFieldMapping - get_completed_since raw fields
+// ============================================================
+describe('generateFieldMapping - get_completed_since raw fields', () => {
+  it('has explicit mappings for every completion Raw field', () => {
+    for (const field of GET_COMPLETED_TASK_RAW_FIELDS) {
+      const result = generateFieldMapping('tasks', [field]);
+      expect(result).not.toContain(`${field}: item.${field} !== undefined`);
+    }
   });
 });
 

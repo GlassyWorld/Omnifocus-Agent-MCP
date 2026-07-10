@@ -23,9 +23,10 @@ OmniFocus 成为执行状态的事实来源。
 只有当用户明确要求创建任务、编辑任务或以其他方式修改 OmniFocus 数据库时，未来
 才允许进入写入路径。任何此类能力都必须使用经过明确设计的写入路径。
 
-当前个性化业务 Tools `get_task` 和 `get_project` 都是只读 Tool。在开发期间，原始
-upstream mutation Tools 可能仍然注册在 Server 源码中。Codex MCP 使用
-`enabled_tools` 作为客户端 allow list，限制当前客户端配置中实际暴露的 Tools。
+当前个性化业务 Tools `get_task`、`get_project` 和 `get_completed_since` 都是只读
+Tool。在开发期间，原始 upstream mutation Tools 可能仍然注册在 Server 源码中。
+Codex MCP 使用 `enabled_tools` 作为客户端 allow list，限制当前客户端配置中实际
+暴露的 Tools。
 
 客户端 allow list 并不等同于最终的 server-side read-only architecture。正式只读
 版本最终必须在 Server Tool Surface 层完成收口。
@@ -116,6 +117,24 @@ ProjectView
 get_project
 ```
 
+当前已经实现的 `get_completed_since` 链路：
+
+```text
+queryOmnifocus
+    |
+    v
+completionAdapter
+    |
+    v
+completionClassifier + completionMapper
+    |
+    v
+CompletedTaskView[]
+    |
+    v
+get_completed_since
+```
+
 ### Raw Layer
 
 职责：
@@ -141,7 +160,7 @@ validate
 normalize valid raw values
     |
     v
-RawTask / RawProject
+RawTask / RawProject / RawCompletedTask
 ```
 
 核心原则：规范化有效数据，不修复损坏的 contract。字段类型错误或必需 Raw 字段缺失
@@ -151,6 +170,7 @@ RawTask / RawProject
 
 - `src/domain/task/taskAdapter.ts`
 - `src/domain/project/projectAdapter.ts`
+- `src/domain/completion/completionAdapter.ts`
 
 ### Domain Layer
 
@@ -165,11 +185,14 @@ RawTask / RawProject
 - 对 Project kind 和 Project status 进行解释。
 - 解释 Project Due 和 Defer 的 direct/effective semantics。
 - 将 `RawProject` 映射为 `ProjectView`。
+- 对完成事件中的 action 和 action group 进行分类。
+- 将 `RawCompletedTask` 映射为稳定的 `CompletedTaskView`。
 
 当前目录：
 
 - `src/domain/task/`
 - `src/domain/project/`
+- `src/domain/completion/`
 
 ### Tool Layer
 
@@ -178,7 +201,7 @@ RawTask / RawProject
 - 定义 MCP input schema。
 - 执行 Tool 参数规则。
 - 对 Tool errors 进行分类。
-- 执行单任务结果约束。
+- 执行各业务 Tool 的单对象或事件集合结果约束。
 - 生成 MCP response。
 
 当前实现：
@@ -187,6 +210,8 @@ RawTask / RawProject
 - `src/tools/primitives/getTask.ts`
 - `src/tools/definitions/getProject.ts`
 - `src/tools/primitives/getProject.ts`
+- `src/tools/definitions/getCompletedSince.ts`
+- `src/tools/primitives/getCompletedSince.ts`
 
 ## 5. Task 领域语义
 
@@ -371,7 +396,48 @@ Folder context 与 Project identity 分离；Project 的直接任务来自 `item
 错误码与 `get_task` 保持一致：`not_found`、`ambiguous_match`、
 `invalid_arguments`、`query_failed`。
 
-## 9. Raw 契约
+## 9. get_completed_since
+
+`get_completed_since` 是第三个已经实现的 Domain Tool。
+
+定位：
+
+- Read-only。
+- 读取明确时间区间内的直接完成事实。
+- 为历史回顾与后续 Snapshot 工作流提供稳定的完成事件 JSON。
+
+输入：
+
+```ts
+{
+  since: string;
+  until?: string;
+}
+```
+
+规则：
+
+- `since` 必填，`until` 可选。
+- 时间必须是带 `Z` 或明确 UTC offset 的 ISO 8601 datetime。
+- 输入会规范化为 UTC；省略 `until` 时只读取一次当前时间作为上界。
+- 查询区间包含上下边界。
+- 只根据 direct `completionDate` 判断完成时间，不使用 `modificationDate`、
+  `taskStatus` 或 `effectiveCompletedDate` 推导完成事实。
+- 结果固定按 `completionDate` 降序排列。
+- Project root completion 会被排除，action group completion 会被保留。
+- 空区间结果是成功响应，不返回 `not_found`。
+- 不公开内部 `RawCompletedTask`，不提供 mutation capability。
+
+输出事件包含 identity、note、`action | action_group` kind、`completedDate`、Project
+context、Inbox location、tags 和 creation/modification timestamps。它不包含 `raw`、
+`status` 或 `taskStatus`。
+
+稳定错误码：
+
+- `invalid_arguments`
+- `query_failed`
+
+## 10. Raw 契约
 
 `get_task` 使用固定的 `GET_TASK_RAW_FIELDS` 字段集合。该集合中的每个字段都必须具有
 显式 query field mapping。此 Tool 不依赖通用 `item.${field}` fallback。
@@ -413,7 +479,20 @@ Project mapping，不依赖 generic fallback。`RawProject` 覆盖：
 
 `src/domain/project/projectTypes.ts` 是 `RawProject` 和 `ProjectView` 的代码级事实来源。
 
-## 10. 测试策略
+`get_completed_since` 使用固定的 `GET_COMPLETED_TASK_RAW_FIELDS` 字段集合。所有字段
+都具有显式 task mapping，不依赖 generic fallback。`RawCompletedTask` 覆盖：
+
+- Identity、name 和 note。
+- Direct `completionDate`。
+- Project context 和 Inbox location。
+- Tags。
+- `isProjectRoot` 与 `hasChildren` 分类 facts。
+- Creation 和 modification timestamps。
+
+`src/domain/completion/completionTypes.ts` 是 `RawCompletedTask` 和
+`CompletedTaskView` 的代码级事实来源。
+
+## 11. 测试策略
 
 ### Unit / Fixture Tests
 
@@ -429,6 +508,9 @@ Project mapping，不依赖 generic fallback。`RawProject` 覆盖：
 - Project Adapter Contract。
 - Project kind、status 和 date semantics。
 - Project Mapper 和 task summary。
+- Completion Adapter Contract。
+- Completion event kind 和 Mapper。
+- 带时区时间参数规范化、区间校验和错误分类。
 - Tool 参数和错误行为。
 
 这些测试不会访问真实 OmniFocus 数据库。
@@ -440,7 +522,8 @@ Project mapping，不依赖 generic fallback。`RawProject` 覆盖：
 - Domain 不依赖 MCP Tool error types。
 - Adapter 不静默修复无效 Raw types。
 - Tool 代码不包含 Domain semantics。
-- `get_task` 和 `get_project` 都不依赖通用 Raw field fallback。
+- `get_task`、`get_project` 和 `get_completed_since` 都不依赖通用 Raw field
+  fallback。
 
 ### Server-side Acceptance
 
@@ -465,8 +548,11 @@ expected logic 导入：
 - `projectClassifier`
 - `projectDateSemantics`
 - `projectMapper`
+- `completionAdapter`
+- `completionClassifier`
+- `completionMapper`
 
-## 11. get_task 验收结果
+## 12. get_task 验收结果
 
 真实数据库 server-side acceptance 结果：
 
@@ -507,7 +593,7 @@ expected logic 导入：
 `NOT OBSERVED` 不等于 `FAIL`。没有为了制造缺失的测试 Case 而创建或修改生产
 OmniFocus 数据。
 
-## 12. get_project 验收结果
+## 13. get_project 验收结果
 
 当前 regression 结果：
 
@@ -554,7 +640,56 @@ summary 和 direct due。Mutation calls 和 OmniFocus writes 均为 0。
 `NOT OBSERVED` 不等于 `FAIL`。没有为了补齐缺失 Case 而创建或修改真实 OmniFocus
 数据。
 
-## 13. 开发规则
+## 14. get_completed_since 验收结果
+
+当前 regression 结果：
+
+- Test files：20 passed
+- Tests：410 passed
+- Failures：0
+- TypeScript build：PASS，0 errors
+- `git diff --check`：PASS
+
+真实数据库 server-side acceptance 使用固定 UTC 区间
+`2026-01-01T00:00:00.000Z` 至 `2026-07-10T23:59:59.999Z`，结果：
+
+- MCP initialize：PASS
+- `get_completed_since` registration：PASS
+- Raw Oracle：PASS
+- Raw completion records：149
+- Project root records excluded：113
+- Expected completion events：36
+- MCP completion events：36
+- Field mismatch：0
+- Raw Contract error：0
+- Adapter error：0
+- Mutation Tool calls：0
+- Server-side acceptance：PASS
+
+已观察并通过：ordinary action completion、action group completion、
+project-contained completion、Inbox completion、带 tags、无 tags 和多个完成事件。
+区间边界上没有自然存在的完成事件，因此 same boundary timestamp 为
+`NOT OBSERVED`。
+
+Codex client acceptance 使用当前 `omnifocus-local` 和固定 UTC 区间
+`2026-07-01T00:00:00.000Z` 至 `2026-07-10T23:59:59.999Z`，返回 9 个事件。已验证：
+
+- 显式区间查询和稳定事件结构。
+- ordinary action 与 action group kind。
+- Project context。
+- 带 tags 与无 tags 事件。
+- `completionDate` 降序。
+- Project root 排除。
+- 等价时区 offset 归一化。
+- 空区间成功返回空数组。
+- date-only、无时区 datetime 和反向区间均返回 `invalid_arguments`。
+- `raw`、`status` 和 `taskStatus` 均未公开。
+
+该 client acceptance 区间未观察到 Inbox completion，因此该 Case 为
+`NOT OBSERVED`；server-side acceptance 的更宽区间已经观察并验证该 Case。Mutation
+calls 和 OmniFocus writes 均为 0，Codex client acceptance 总结论为 PASS。
+
+## 15. 开发规则
 
 1. 默认只读。
 2. 不得为了满足测试 Case 而修改真实 OmniFocus 数据。
@@ -564,7 +699,7 @@ summary 和 direct due。Mutation calls 和 OmniFocus writes 均为 0。
 6. Direct facts 必须始终与 effective 或 inherited facts 分离。
 7. Adapter 不得修复损坏的 Raw Contract。
 8. Domain Layer 不得依赖 MCP Tool Layer。
-9. Business Tool 不得公开内部 `RawTask` 或 `RawProject`。
+9. Business Tool 不得公开内部 `RawTask`、`RawProject` 或 `RawCompletedTask`。
 10. 每个新 Domain Tool 都使用 Raw Primitive Oracle 与 Domain MCP Tool 对比进行
     server-side acceptance。
 11. 一个 Tool 完成、验收并冻结后，再开始下一个 Tool。
@@ -572,7 +707,7 @@ summary 和 direct due。Mutation calls 和 OmniFocus writes 均为 0。
 13. 未经明确任务，不删除 upstream Tools。
 14. 不把具体项目历史、N322 历史或个人判断硬编码进 MCP。
 
-## 14. 当前状态与下一步方向
+## 16. 当前状态与下一步方向
 
 已完成：
 
@@ -599,11 +734,18 @@ get_project
     -> architecture checked
     -> server-side acceptance PASS
     -> Codex client acceptance PASS
+Completion Domain Layer
+    -> implemented
+get_completed_since
+    -> implemented
+    -> unit tested
+    -> architecture checked
+    -> server-side acceptance PASS
+    -> Codex client acceptance PASS
 ```
 
 计划中或未来工作，尚未实现：
 
-- `get_completed_since`。
 - `get_work_actions`。
 - `get_lean_snapshot`。
 - `get_full_snapshot`。
@@ -613,8 +755,8 @@ get_project
 推荐的下一步方向：
 
 ```text
-Freeze get_project milestone
+Freeze get_completed_since milestone
     |
     v
-Design get_completed_since using the established pattern
+Design get_work_actions using the established pattern
 ```
