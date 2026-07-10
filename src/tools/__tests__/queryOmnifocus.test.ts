@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { _testExports as primitives } from '../primitives/queryOmnifocus.js';
 import { _testExports as definitions } from '../definitions/queryOmnifocus.js';
 import { GET_TASK_RAW_FIELDS } from '../primitives/getTask.js';
+import { GET_PROJECT_RAW_FIELDS } from '../primitives/getProject.js';
 
 const { escapeJXA, generateFilterConditions, generateFieldMapping } = primitives;
 const { formatTasks, formatProjects, formatFolders, formatFilters } = definitions;
@@ -498,6 +499,47 @@ describe('generateFilterConditions - projectName (projects)', () => {
     const result = generateFilterConditions('tasks', { projectName: 'devices' });
     expect(result).toContain('item.containingProject');
     expect(result).toContain('devices');
+  });
+
+  it('generates case-sensitive exact equality for projectNameExact', () => {
+    const result = generateFilterConditions('projects', { projectNameExact: 'Exact Project' });
+    expect(result).toContain('(item.name || "") !== "Exact Project"');
+    expect(result).not.toContain('.toLowerCase()');
+    expect(result).not.toContain('.includes');
+  });
+
+  it('escapes projectNameExact special characters', () => {
+    const result = generateFilterConditions('projects', { projectNameExact: 'a"b' });
+    expect(result).toContain('a\\"b');
+  });
+});
+
+// ============================================================
+// generateFieldMapping - get_project raw fields
+// ============================================================
+describe('generateFieldMapping - get_project raw fields', () => {
+  it('has explicit mappings for every GET_PROJECT_RAW_FIELDS entry', () => {
+    for (const field of GET_PROJECT_RAW_FIELDS) {
+      const result = generateFieldMapping('projects', [field]);
+      expect(result).not.toContain(`${field}: item.${field} !== undefined`);
+    }
+  });
+
+  it('maps project-specific task and folder fields explicitly', () => {
+    const result = generateFieldMapping('projects', [
+      'folderId',
+      'containsSingletonActions',
+      'directTaskIds',
+      'taskIds',
+      'taskStatusCounts',
+    ]);
+    expect(result).toContain('folderId: item.parentFolder ? item.parentFolder.id.primaryKey : null');
+    expect(result).toContain('containsSingletonActions: Boolean(item.containsSingletonActions)');
+    expect(result).toContain('directTaskIds: item.tasks ? item.tasks.map');
+    expect(result).toContain('taskIds: item.flattenedTasks ? item.flattenedTasks.map');
+    expect(result).toContain('taskStatusCounts: (() =>');
+    expect(result).toContain('Task.Status.Completed');
+    expect(result).toContain('Task.Status.Dropped');
   });
 });
 

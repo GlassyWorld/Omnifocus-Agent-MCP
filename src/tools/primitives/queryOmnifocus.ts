@@ -15,6 +15,7 @@ export interface QueryOmnifocusParams {
   filters?: {
     projectId?: string;
     projectName?: string;
+    projectNameExact?: string;
     taskId?: string;
     taskNameExact?: string;
     taskName?: string;
@@ -465,6 +466,13 @@ function generateFilterConditions(entity: string, filters: any): string {
       `);
     }
 
+    if (filters.projectNameExact) {
+      const safeName = escapeJXA(filters.projectNameExact);
+      conditions.push(`
+        if ((item.name || "") !== "${safeName}") return false;
+      `);
+    }
+
     if (filters.folderId) {
       conditions.push(`
         {
@@ -642,7 +650,7 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
     } else if (field === 'taskStatus') {
       return `taskStatus: taskStatusMap[item.taskStatus]`;
     } else if (field === 'status') {
-      return `status: projectStatusMap[item.status]`;
+      return `status: projectStatusMap[item.status] || "Unknown"`;
     } else if (field === 'modificationDate' || field === 'modified') {
       return `modificationDate: formatDate(item.modified)`;
     } else if (field === 'creationDate' || field === 'added') {
@@ -689,10 +697,41 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
       return `hasChildren: Boolean(item.hasChildren)`;
     } else if (field === 'completedByChildren') {
       return `completedByChildren: Boolean(item.completedByChildren)`;
+    } else if (field === 'containsSingletonActions' && entity === 'projects') {
+      return `containsSingletonActions: Boolean(item.containsSingletonActions)`;
     } else if (field === 'folderName') {
       return `folderName: item.parentFolder ? item.parentFolder.name : null`;
+    } else if (field === 'folderId' && entity === 'projects') {
+      return `folderId: item.parentFolder ? item.parentFolder.id.primaryKey : null`;
     } else if (field === 'folderID') {
       return `folderID: item.parentFolder ? item.parentFolder.id.primaryKey : null`;
+    } else if (field === 'directTaskIds' && entity === 'projects') {
+      return `directTaskIds: item.tasks ? item.tasks.map(t => t.id.primaryKey) : []`;
+    } else if (field === 'taskIds' && entity === 'projects') {
+      return `taskIds: item.flattenedTasks ? item.flattenedTasks.map(t => t.id.primaryKey) : []`;
+    } else if (field === 'taskStatusCounts' && entity === 'projects') {
+      return `taskStatusCounts: (() => {
+            const counts = {
+              available: 0,
+              next: 0,
+              blocked: 0,
+              dueSoon: 0,
+              overdue: 0,
+              completed: 0,
+              dropped: 0
+            };
+            const projectTasks = item.flattenedTasks || [];
+            projectTasks.forEach(task => {
+              if (task.taskStatus === Task.Status.Available) counts.available += 1;
+              else if (task.taskStatus === Task.Status.Next) counts.next += 1;
+              else if (task.taskStatus === Task.Status.Blocked) counts.blocked += 1;
+              else if (task.taskStatus === Task.Status.DueSoon) counts.dueSoon += 1;
+              else if (task.taskStatus === Task.Status.Overdue) counts.overdue += 1;
+              else if (task.taskStatus === Task.Status.Completed) counts.completed += 1;
+              else if (task.taskStatus === Task.Status.Dropped) counts.dropped += 1;
+            });
+            return counts;
+          })()`;
     } else if (field === 'taskCount') {
       return `taskCount: item.tasks ? item.tasks.length : 0`;
     } else if (field === 'tasks') {

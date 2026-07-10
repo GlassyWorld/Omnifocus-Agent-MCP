@@ -18,6 +18,7 @@ import * as batchAddItemsTool from './tools/definitions/batchAddItems.js';
 import * as batchRemoveItemsTool from './tools/definitions/batchRemoveItems.js';
 import * as queryOmniFocusTool from './tools/definitions/queryOmnifocus.js';
 import * as getTaskTool from './tools/definitions/getTask.js';
+import * as getProjectTool from './tools/definitions/getProject.js';
 import * as listPerspectivesTool from './tools/definitions/listPerspectives.js';
 import * as getPerspectiveViewTool from './tools/definitions/getPerspectiveView.js';
 import * as listTagsTool from './tools/definitions/listTags.js';
@@ -139,6 +140,13 @@ server.tool(
   "Read-only. Get one exact OmniFocus task by ID or exact name.",
   getTaskTool.schema.shape,
   getTaskTool.handler
+);
+
+server.tool(
+  "get_project",
+  "Read-only. Get one exact OmniFocus project by canonical ID or exact name.",
+  getProjectTool.schema.shape,
+  getProjectTool.handler
 );
 
 server.tool(

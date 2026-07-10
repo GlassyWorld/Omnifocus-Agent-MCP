@@ -23,9 +23,9 @@ OmniFocus 成为执行状态的事实来源。
 只有当用户明确要求创建任务、编辑任务或以其他方式修改 OmniFocus 数据库时，未来
 才允许进入写入路径。任何此类能力都必须使用经过明确设计的写入路径。
 
-当前个性化业务 Tool `get_task` 是只读 Tool。在开发期间，原始 upstream mutation
-Tools 可能仍然注册在 Server 源码中。Codex MCP 使用 `enabled_tools` 作为客户端
-allow list，限制当前客户端配置中实际暴露的 Tools。
+当前个性化业务 Tools `get_task` 和 `get_project` 都是只读 Tool。在开发期间，原始
+upstream mutation Tools 可能仍然注册在 Server 源码中。Codex MCP 使用
+`enabled_tools` 作为客户端 allow list，限制当前客户端配置中实际暴露的 Tools。
 
 客户端 allow list 并不等同于最终的 server-side read-only architecture。正式只读
 版本最终必须在 Server Tool Surface 层完成收口。
@@ -95,6 +95,27 @@ TaskView
 get_task
 ```
 
+当前已经实现的 `get_project` 链路：
+
+```text
+queryOmnifocus
+    |
+    v
+projectAdapter
+    |
+    v
+projectClassifier + projectDateSemantics
+    |
+    v
+projectMapper
+    |
+    v
+ProjectView
+    |
+    v
+get_project
+```
+
 ### Raw Layer
 
 职责：
@@ -120,13 +141,16 @@ validate
 normalize valid raw values
     |
     v
-RawTask
+RawTask / RawProject
 ```
 
 核心原则：规范化有效数据，不修复损坏的 contract。字段类型错误或必需 Raw 字段缺失
 时必须明确失败，而不是静默转换。
 
-当前核心实现：`src/domain/task/taskAdapter.ts`。
+当前核心实现：
+
+- `src/domain/task/taskAdapter.ts`
+- `src/domain/project/projectAdapter.ts`
 
 ### Domain Layer
 
@@ -138,8 +162,14 @@ RawTask
 - 解释 drop semantics。
 - 解释 flag semantics。
 - 将 `RawTask` 映射为 `TaskView`。
+- 对 Project kind 和 Project status 进行解释。
+- 解释 Project Due 和 Defer 的 direct/effective semantics。
+- 将 `RawProject` 映射为 `ProjectView`。
 
-当前目录：`src/domain/task/`。
+当前目录：
+
+- `src/domain/task/`
+- `src/domain/project/`
 
 ### Tool Layer
 
@@ -155,6 +185,8 @@ RawTask
 
 - `src/tools/definitions/getTask.ts`
 - `src/tools/primitives/getTask.ts`
+- `src/tools/definitions/getProject.ts`
+- `src/tools/primitives/getProject.ts`
 
 ## 5. Task 领域语义
 
@@ -239,7 +271,35 @@ Inbox 不是 Project。
 
 兼容性展示字符串 `"Inbox"` 永远不会被映射为 Project 对象。
 
-## 6. get_task
+## 6. Project 领域语义
+
+Project Domain 使用 `project.task.id.primaryKey` 作为 canonical Project ID。现有
+`projectId` query filter 继续兼容 root task ID 和 OmniJS Project ID，但
+`get_project` 会在 Adapter 之后执行 canonical ID 精确比较。
+
+Project kind 分为：
+
+```text
+containsSingletonActions = true
+    -> single_actions
+
+otherwise
+    -> standard
+```
+
+Project status 保留 OmniFocus 原始状态，并提供稳定 boolean 语义：
+
+- `Active` -> `active`
+- `OnHold` -> `onHold`
+- `Done` -> `completed`
+- `Dropped` -> `dropped`
+
+Project Due 和 Defer 日期与 Task 日期使用相同的 `direct/effective/source` 结构。
+Folder context 与 Project identity 分离；Project 的直接任务来自 `item.tasks`，全部后代
+任务来自 `item.flattenedTasks`。任务汇总保留直接 ID、全部 ID、总数和按 OmniFocus
+`Task.Status` 计算的计数。
+
+## 7. get_task
 
 `get_task` 是第一个已经实现的 Domain Tool。
 
@@ -277,7 +337,41 @@ Inbox 不是 Project。
 - `invalid_arguments`
 - `query_failed`
 
-## 7. Raw 契约
+## 8. get_project
+
+`get_project` 是第二个已经实现的 Domain Tool。
+
+定位：
+
+- Read-only。
+- 单 Project 详情查询。
+- 稳定的 Domain JSON response。
+
+输入：
+
+```ts
+{
+  id?: string;
+  name?: string;
+}
+```
+
+必须且只能提供 `id` 或 `name` 中的一个。
+
+规则：
+
+- ID 只接受 canonical Project root task ID。
+- Name 使用区分大小写的精确匹配。
+- 不支持 `contains`。
+- 不支持由调用方选择 `fields`。
+- 始终允许读取 completed 和 dropped projects。
+- 不公开内部 `RawProject`。
+- 不提供 mutation capability。
+
+错误码与 `get_task` 保持一致：`not_found`、`ambiguous_match`、
+`invalid_arguments`、`query_failed`。
+
+## 9. Raw 契约
 
 `get_task` 使用固定的 `GET_TASK_RAW_FIELDS` 字段集合。该集合中的每个字段都必须具有
 显式 query field mapping。此 Tool 不依赖通用 `item.${field}` fallback。
@@ -306,7 +400,20 @@ Inbox 不是 Project。
 
 `src/domain/task/taskTypes.ts` 是 `RawTask` 和 `TaskView` 的代码级事实来源。
 
-## 8. 测试策略
+`get_project` 使用固定的 `GET_PROJECT_RAW_FIELDS` 字段集合，所有字段都具有显式
+Project mapping，不依赖 generic fallback。`RawProject` 覆盖：
+
+- Canonical Project identity、name、note 和 status。
+- Sequential、flagged、single-actions 和 `completedByChildren` facts。
+- Folder context。
+- Direct task IDs 和 flattened task IDs。
+- 按 `Task.Status` 分类的任务计数。
+- Direct/effective Due 和 Defer facts。
+- Creation 和 modification timestamps。
+
+`src/domain/project/projectTypes.ts` 是 `RawProject` 和 `ProjectView` 的代码级事实来源。
+
+## 10. 测试策略
 
 ### Unit / Fixture Tests
 
@@ -319,6 +426,9 @@ Inbox 不是 Project。
 - Drop Semantics。
 - Flag Semantics。
 - Task Mapper。
+- Project Adapter Contract。
+- Project kind、status 和 date semantics。
+- Project Mapper 和 task summary。
 - Tool 参数和错误行为。
 
 这些测试不会访问真实 OmniFocus 数据库。
@@ -330,7 +440,7 @@ Inbox 不是 Project。
 - Domain 不依赖 MCP Tool error types。
 - Adapter 不静默修复无效 Raw types。
 - Tool 代码不包含 Domain semantics。
-- `get_task` 不依赖通用 Raw field fallback。
+- `get_task` 和 `get_project` 都不依赖通用 Raw field fallback。
 
 ### Server-side Acceptance
 
@@ -343,7 +453,7 @@ Domain MCP Tool
 ```
 
 Raw Oracle 直接调用 `queryOmnifocus` primitive。System Under Test 使用 STDIO MCP
-client 调用本地构建 Server 上的 `get_task`。
+client 调用本地构建 Server 上对应的 Domain Tool。
 
 临时 acceptance harness 独立计算 expected semantics。它不得将以下生产模块作为
 expected logic 导入：
@@ -352,8 +462,11 @@ expected logic 导入：
 - `dateSemantics`
 - `statusSemantics`
 - `taskMapper`
+- `projectClassifier`
+- `projectDateSemantics`
+- `projectMapper`
 
-## 9. get_task 验收结果
+## 11. get_task 验收结果
 
 真实数据库 server-side acceptance 结果：
 
@@ -394,7 +507,54 @@ expected logic 导入：
 `NOT OBSERVED` 不等于 `FAIL`。没有为了制造缺失的测试 Case 而创建或修改生产
 OmniFocus 数据。
 
-## 10. 开发规则
+## 12. get_project 验收结果
+
+当前 regression 结果：
+
+- Test files：17 passed
+- Tests：343 passed
+- TypeScript build：PASS
+- `git diff --check`：PASS
+
+真实数据库 server-side acceptance 结果：
+
+- MCP initialize：PASS
+- `get_project` registration：PASS
+- Raw Oracle：PASS
+- Raw projects：135
+- Raw fields：19
+- OBSERVED cases：6
+- OBSERVED case result：6 / 6 PASS
+- Field mismatch：0
+- Raw Contract error：0
+- Adapter error：0
+- Mutation Tool calls：0
+- Server-side acceptance：PASS
+
+已观察并通过：
+
+- active project
+- sequential project
+- single actions
+- folder project
+- completed project
+- direct due
+
+未观察到：
+
+- dropped project
+- inherited due
+- direct defer
+- inherited defer
+
+Codex client acceptance 结果：PASS。已通过当前 `omnifocus-local` 验证 canonical ID
+精确查询、name 精确查询、standard project、single actions、Folder context、task
+summary 和 direct due。Mutation calls 和 OmniFocus writes 均为 0。
+
+`NOT OBSERVED` 不等于 `FAIL`。没有为了补齐缺失 Case 而创建或修改真实 OmniFocus
+数据。
+
+## 13. 开发规则
 
 1. 默认只读。
 2. 不得为了满足测试 Case 而修改真实 OmniFocus 数据。
@@ -404,7 +564,7 @@ OmniFocus 数据。
 6. Direct facts 必须始终与 effective 或 inherited facts 分离。
 7. Adapter 不得修复损坏的 Raw Contract。
 8. Domain Layer 不得依赖 MCP Tool Layer。
-9. Business Tool 不得公开内部 `RawTask`。
+9. Business Tool 不得公开内部 `RawTask` 或 `RawProject`。
 10. 每个新 Domain Tool 都使用 Raw Primitive Oracle 与 Domain MCP Tool 对比进行
     server-side acceptance。
 11. 一个 Tool 完成、验收并冻结后，再开始下一个 Tool。
@@ -412,7 +572,7 @@ OmniFocus 数据。
 13. 未经明确任务，不删除 upstream Tools。
 14. 不把具体项目历史、N322 历史或个人判断硬编码进 MCP。
 
-## 11. 当前状态与下一步方向
+## 14. 当前状态与下一步方向
 
 已完成：
 
@@ -430,12 +590,19 @@ get_task
     -> unit tested
     -> architecture checked
     -> server-side acceptance PASS
+    -> Codex client acceptance PASS
+Project Domain Layer
+    -> implemented
+get_project
+    -> implemented
+    -> unit tested
+    -> architecture checked
+    -> server-side acceptance PASS
+    -> Codex client acceptance PASS
 ```
 
 计划中或未来工作，尚未实现：
 
-- `get_task` Codex client acceptance。
-- `get_project`。
 - `get_completed_since`。
 - `get_work_actions`。
 - `get_lean_snapshot`。
@@ -446,14 +613,8 @@ get_task
 推荐的下一步方向：
 
 ```text
-Expose get_task through Codex enabled_tools
+Freeze get_project milestone
     |
     v
-Codex client acceptance
-    |
-    v
-Freeze get_task milestone
-    |
-    v
-Design get_project using the established pattern
+Design get_completed_since using the established pattern
 ```

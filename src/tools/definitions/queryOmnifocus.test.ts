@@ -65,4 +65,11 @@ describe('queryOmnifocus schema', () => {
       expect(result.success).toBe(true);
     });
   });
+
+  describe('project exact lookup filters', () => {
+    it('accepts projectNameExact', () => {
+      const input = { entity: 'projects', filters: { projectNameExact: 'Exact Project Name' } };
+      expect(schema.safeParse(input).success).toBe(true);
+    });
+  });
 });

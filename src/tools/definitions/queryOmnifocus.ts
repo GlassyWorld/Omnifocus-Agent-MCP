@@ -9,6 +9,7 @@ export const schema = z.object({
   filters: z.object({
     projectId: z.string().optional().describe("Filter tasks by exact project ID (use when you know the specific project ID)"),
     projectName: z.string().optional().describe("Filter tasks by project name. CASE-INSENSITIVE PARTIAL MATCHING - 'review' matches 'Weekly Review', 'Review Documents', etc. Special value: 'inbox' returns inbox tasks"),
+    projectNameExact: z.string().optional().describe("Filter projects by exact project name. CASE-SENSITIVE EXACT MATCH. Only applies to 'projects' entity"),
     taskId: z.string().optional().describe("Filter tasks by exact task ID. Only applies to 'tasks' entity"),
     taskNameExact: z.string().optional().describe("Filter tasks by exact task name. CASE-SENSITIVE EXACT MATCH. Only applies to 'tasks' entity"),
     taskName: z.string().optional().describe("Filter tasks by task name. CASE-INSENSITIVE PARTIAL MATCHING - 'email' matches 'Send email to IT', 'Confirm email' etc. Useful for fuzzy searching specific tasks across all projects"),
@@ -34,7 +35,7 @@ export const schema = z.object({
     reviewDue: z.boolean().optional().describe("Filter projects by review status. true = only projects whose next review date is today or in the past (due for review). false = only projects not yet due for review. Only applies to 'projects' entity")
   }).optional().describe("Optional filters to narrow results. ALL filters combine with AND logic (must match all). Within array filters (tags, status) OR logic applies"),
   
-  fields: z.array(z.string()).optional().describe("Specific fields to return (reduces response size). TASK FIELDS: id, name, note, flagged, effectiveFlagged, completed, taskStatus, dueDate, deferDate, plannedDate, effectiveDueDate, effectiveDeferDate, effectivePlannedDate, completionDate, effectiveCompletedDate, dropDate, effectiveDropDate, estimatedMinutes, tagNames, tags, projectName, projectId, inInbox, isProjectRoot, parentId, childIds, hasChildren, sequential, completedByChildren, isRepeating, repetitionRule, modificationDate (or modified), creationDate (or added). PROJECT FIELDS: id, name, status, note, folderName, folderID, sequential, dueDate, deferDate, effectiveDueDate, effectiveDeferDate, completionDate, dropDate, effectiveDropDate, completedByChildren, containsSingletonActions, taskCount, tasks, nextReviewDate, reviewInterval, modificationDate, creationDate. FOLDER FIELDS: id, name, path, parentFolderID, status, projectCount, projects, subfolders. NOTE: Date fields use 'added' and 'modified' in OmniFocus API"),
+  fields: z.array(z.string()).optional().describe("Specific fields to return (reduces response size). TASK FIELDS: id, name, note, flagged, effectiveFlagged, completed, taskStatus, dueDate, deferDate, plannedDate, effectiveDueDate, effectiveDeferDate, effectivePlannedDate, completionDate, effectiveCompletedDate, dropDate, effectiveDropDate, estimatedMinutes, tagNames, tags, projectName, projectId, inInbox, isProjectRoot, parentId, childIds, hasChildren, sequential, completedByChildren, isRepeating, repetitionRule, modificationDate (or modified), creationDate (or added). PROJECT FIELDS: id, name, status, note, folderId, folderName, folderID, sequential, flagged, dueDate, deferDate, effectiveDueDate, effectiveDeferDate, completionDate, dropDate, effectiveDropDate, completedByChildren, containsSingletonActions, directTaskIds, taskIds, taskStatusCounts, taskCount, tasks, nextReviewDate, reviewInterval, modificationDate, creationDate. FOLDER FIELDS: id, name, path, parentFolderID, status, projectCount, projects, subfolders. NOTE: Date fields use 'added' and 'modified' in OmniFocus API"),
   
   limit: z.number().optional().describe("Maximum number of items to return. Useful for large result sets. Default: no limit"),
   
@@ -146,6 +147,7 @@ function formatFilters(filters: any): string {
   const parts = [];
   if (filters.projectId) parts.push(`projectId: "${filters.projectId}"`);
   if (filters.projectName) parts.push(`project: "${filters.projectName}"`);
+  if (filters.projectNameExact) parts.push(`projectNameExact: "${filters.projectNameExact}"`);
   if (filters.taskId) parts.push(`taskId: "${filters.taskId}"`);
   if (filters.taskNameExact) parts.push(`taskNameExact: "${filters.taskNameExact}"`);
   if (filters.taskName) parts.push(`taskName: "${filters.taskName}"`);
