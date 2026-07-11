@@ -1,6 +1,7 @@
 import type {
   AttentionReason,
   LeanAttentionItem,
+  LeanProjectDeadlineItem,
   LeanProjectSummary,
   LeanTaskSummary,
   RawLeanTask,
@@ -22,7 +23,7 @@ const REASON_RANK: Record<AttentionReason, number> = {
   flagged: 3,
 };
 
-const SOURCE_RANK = { direct: 0, inherited: 1, none: 2 } as const;
+const PROJECT_DEADLINE_RANK = { overdue: 0, dueSoon: 1 } as const;
 
 export function compareCodeUnits(left: string, right: string): number {
   if (left < right) return -1;
@@ -49,6 +50,16 @@ export function comparePlannedProjects(
     || compareCodeUnits(left.id, right.id);
 }
 
+export function compareProjectDeadlines(
+  left: LeanProjectDeadlineItem,
+  right: LeanProjectDeadlineItem,
+): number {
+  return compareNumbers(PROJECT_DEADLINE_RANK[left.state], PROJECT_DEADLINE_RANK[right.state])
+    || compareNullableDates(left.project.dates.due.direct, right.project.dates.due.direct)
+    || compareCodeUnits(left.project.name, right.project.name)
+    || compareCodeUnits(left.project.id, right.project.id);
+}
+
 export function compareInboxTasks(left: LeanTaskCandidate, right: LeanTaskCandidate): number {
   return compareNullableDates(left.raw.creationDate, right.raw.creationDate)
     || compareCodeUnits(left.summary.name, right.summary.name)
@@ -63,12 +74,9 @@ export function compareAttention(left: AttentionCandidate, right: AttentionCandi
 
   let detailComparison = 0;
   if (leftReason === 'overdue' || leftReason === 'dueSoon') {
-    detailComparison = compareNumbers(
-      SOURCE_RANK[left.summary.dates.due.source],
-      SOURCE_RANK[right.summary.dates.due.source],
-    ) || compareNullableDates(
-      left.summary.dates.due.effective,
-      right.summary.dates.due.effective,
+    detailComparison = compareNullableDates(
+      left.summary.dates.due.direct,
+      right.summary.dates.due.direct,
     );
   } else if (leftReason === 'planned') {
     detailComparison = compareNullableDates(

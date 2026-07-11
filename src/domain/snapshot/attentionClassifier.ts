@@ -7,8 +7,9 @@ export function classifyAttentionReasons(
 ): AttentionReason[] {
   const reasons: AttentionReason[] = [];
 
-  if (raw.taskStatus === 'Overdue') reasons.push('overdue');
-  if (raw.taskStatus === 'DueSoon') reasons.push('dueSoon');
+  const due = classifyDate(raw.dueDate, raw.effectiveDueDate);
+  if (due.source === 'direct' && raw.taskStatus === 'Overdue') reasons.push('overdue');
+  if (due.source === 'direct' && raw.taskStatus === 'DueSoon') reasons.push('dueSoon');
 
   const planned = classifyDate(raw.plannedDate, raw.effectivePlannedDate);
   if (

@@ -116,6 +116,7 @@ describe('getLeanSnapshot primitive', () => {
       expect(result.snapshot.scope).toBe('all');
       expect(result.snapshot.projects.active.total).toBe(1);
       expect(result.snapshot.projects.planned.total).toBe(0);
+      expect(result.snapshot.projects.deadline.total).toBe(0);
       expect(result.snapshot.inbox.total).toBe(1);
       expect(JSON.stringify(result.snapshot)).not.toMatch(/"raw"|"note"/);
     }
@@ -167,5 +168,15 @@ describe('getLeanSnapshot primitive', () => {
     const result = await getLeanSnapshot(params);
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error).toContain('Missing Project root Task');
+  });
+
+  it('returns Project/root Due consistency failures even without deadline visibility', async () => {
+    mockSuccessfulQueries(
+      [{ ...validRootTask, dueDate: '2026-07-10T00:00:00.000Z', effectiveDueDate: '2026-07-10T00:00:00.000Z' }],
+      [validProject],
+    );
+    const result = await getLeanSnapshot(params);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toContain('Project/root Due semantics mismatch');
   });
 });

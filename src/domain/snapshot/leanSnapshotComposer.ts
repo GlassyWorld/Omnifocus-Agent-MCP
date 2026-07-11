@@ -2,11 +2,13 @@ import { z } from 'zod';
 import { classifyAttentionReasons } from './attentionClassifier.js';
 import { mapRawLeanProject } from './leanProjectMapper.js';
 import { mapRawLeanTask } from './leanTaskMapper.js';
+import { classifyProjectDeadline } from './projectDeadlineClassifier.js';
 import { isProjectPlannedReady } from './projectPlannedClassifier.js';
-import { resolveProjectPlannedDates } from './snapshotProjectPlannedResolver.js';
+import { resolveProjectRootSemantics } from './snapshotProjectRootSemanticsResolver.js';
 import {
   compareAttention,
   compareInboxTasks,
+  compareProjectDeadlines,
   comparePlannedProjects,
   compareProjects,
   type AttentionCandidate,
@@ -43,14 +45,17 @@ export function composeLeanSnapshot(input: LeanSnapshotComposerInput): LeanSnaps
   assertUniqueIds(input.tasks, 'Task');
   assertUniqueIds(input.projects, 'Project');
 
-  const projectPlannedDates = resolveProjectPlannedDates(input.tasks, input.projects);
-  const projectItems = input.projects.map(project => {
-    const planned = projectPlannedDates.get(project.id);
-    if (!planned) {
-      throw new Error(`Missing resolved Planned semantics for Project ${project.id}`);
+  const projectRootSemantics = resolveProjectRootSemantics(input.tasks, input.projects);
+  const projectCandidates = input.projects.map(project => {
+    const root = projectRootSemantics.get(project.id);
+    if (!root) {
+      throw new Error(`Missing resolved root semantics for Project ${project.id}`);
     }
-    return mapRawLeanProject(project, planned);
+    const summary = mapRawLeanProject(project, root.planned);
+    const deadlineState = classifyProjectDeadline(summary, root);
+    return { summary, deadlineState };
   });
+  const projectItems = projectCandidates.map(candidate => candidate.summary);
   const activeProjects = buildSnapshotList(
     [...projectItems].sort(compareProjects),
     input.limitPerSection,
@@ -59,6 +64,14 @@ export function composeLeanSnapshot(input: LeanSnapshotComposerInput): LeanSnaps
     projectItems
       .filter(project => isProjectPlannedReady(project, input.generatedAt))
       .sort(comparePlannedProjects),
+    input.limitPerSection,
+  );
+  const deadlineProjects = buildSnapshotList(
+    projectCandidates
+      .flatMap(candidate => candidate.deadlineState === null
+        ? []
+        : [{ project: candidate.summary, state: candidate.deadlineState }])
+      .sort(compareProjectDeadlines),
     input.limitPerSection,
   );
 
@@ -101,6 +114,7 @@ export function composeLeanSnapshot(input: LeanSnapshotComposerInput): LeanSnaps
     projects: {
       active: activeProjects,
       planned: plannedProjects,
+      deadline: deadlineProjects,
     },
     attention: {
       total: attentionCandidates.length,

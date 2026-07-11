@@ -99,6 +99,19 @@ export type LeanProjectSummary = {
   };
 };
 
+export type ProjectDeadlineState = "overdue" | "dueSoon";
+
+export type LeanProjectDeadlineItem = {
+  project: LeanProjectSummary;
+  state: ProjectDeadlineState;
+};
+
+export type ProjectRootSemantics = {
+  planned: DateSemantics;
+  due: DateSemantics;
+  taskStatus: ActiveTaskStatus;
+};
+
 export type SnapshotList<T> = {
   total: number;
   returned: number;
@@ -119,6 +132,7 @@ export type LeanSnapshotView = {
   projects: {
     active: SnapshotList<LeanProjectSummary>;
     planned: SnapshotList<LeanProjectSummary>;
+    deadline: SnapshotList<LeanProjectDeadlineItem>;
   };
   attention: {
     total: number;

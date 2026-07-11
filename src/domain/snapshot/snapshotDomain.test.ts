@@ -3,8 +3,9 @@ import { classifyAttentionReasons } from './attentionClassifier.js';
 import { composeLeanSnapshot } from './leanSnapshotComposer.js';
 import { mapRawLeanProject } from './leanProjectMapper.js';
 import { mapRawLeanTask } from './leanTaskMapper.js';
+import { classifyProjectDeadline } from './projectDeadlineClassifier.js';
 import { isProjectPlannedReady } from './projectPlannedClassifier.js';
-import { resolveProjectPlannedDates } from './snapshotProjectPlannedResolver.js';
+import { resolveProjectRootSemantics } from './snapshotProjectRootSemanticsResolver.js';
 import { adaptSnapshotProjectItem } from './snapshotProjectAdapter.js';
 import { adaptSnapshotTaskItem } from './snapshotTaskAdapter.js';
 import { compareCodeUnits } from './snapshotSorting.js';
@@ -258,8 +259,10 @@ describe('Lean mappers reuse shared semantics', () => {
 
 describe('attentionClassifier', () => {
   it.each([
-    [rawTask({ taskStatus: 'Overdue' }), ['overdue']],
-    [rawTask({ taskStatus: 'DueSoon' }), ['dueSoon']],
+    [rawTask({ taskStatus: 'Overdue', dueDate: EARLIER, effectiveDueDate: EARLIER }), ['overdue']],
+    [rawTask({ taskStatus: 'DueSoon', dueDate: LATER, effectiveDueDate: LATER }), ['dueSoon']],
+    [rawTask({ taskStatus: 'Overdue', effectiveDueDate: EARLIER }), []],
+    [rawTask({ taskStatus: 'DueSoon', effectiveDueDate: LATER }), []],
     [rawTask({ plannedDate: EARLIER, effectivePlannedDate: EARLIER }), ['planned']],
     [rawTask({ plannedDate: GENERATED_AT, effectivePlannedDate: GENERATED_AT }), ['planned']],
     [rawTask({ plannedDate: LATER, effectivePlannedDate: LATER }), []],
@@ -274,6 +277,8 @@ describe('attentionClassifier', () => {
   it('preserves fixed multi-reason order and never adds blocked', () => {
     const task = rawTask({
       taskStatus: 'Overdue',
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
       plannedDate: EARLIER,
       effectivePlannedDate: EARLIER,
       effectiveFlagged: true,
@@ -293,8 +298,9 @@ describe('attentionClassifier', () => {
     }), GENERATED_AT)).toEqual(['flagged']);
     expect(classifyAttentionReasons(rawTask({
       taskStatus: 'Overdue',
+      effectiveDueDate: EARLIER,
       effectivePlannedDate: EARLIER,
-    }), GENERATED_AT)).toEqual(['overdue']);
+    }), GENERATED_AT)).toEqual([]);
   });
 
   it('allows a direct-planned Action Group exactly once', () => {
@@ -310,28 +316,87 @@ describe('attentionClassifier', () => {
       effectivePlannedDate: EARLIER,
     }), GENERATED_AT)).toEqual([]);
   });
+
+  it.each([
+    [false, 'DueSoon', true, ['dueSoon']],
+    [false, 'DueSoon', false, []],
+    [false, 'Overdue', true, ['overdue']],
+    [false, 'Overdue', false, []],
+    [true, 'DueSoon', true, ['dueSoon']],
+    [true, 'DueSoon', false, []],
+    [true, 'Overdue', true, ['overdue']],
+    [true, 'Overdue', false, []],
+  ] as const)(
+    'classifies direct-only Due owner for hasChildren=%s status=%s direct=%s',
+    (hasChildren, taskStatus, direct, reasons) => {
+      expect(classifyAttentionReasons(rawTask({
+        hasChildren,
+        taskStatus,
+        dueDate: direct ? EARLIER : null,
+        effectiveDueDate: EARLIER,
+      }), GENERATED_AT)).toEqual(reasons);
+    },
+  );
+
+  it('keeps non-Due reasons independent from inherited Due status', () => {
+    expect(classifyAttentionReasons(rawTask({
+      taskStatus: 'DueSoon',
+      effectiveDueDate: EARLIER,
+      effectiveFlagged: true,
+    }), GENERATED_AT)).toEqual(['flagged']);
+    expect(classifyAttentionReasons(rawTask({
+      taskStatus: 'Overdue',
+      effectiveDueDate: EARLIER,
+      plannedDate: EARLIER,
+      effectivePlannedDate: EARLIER,
+    }), GENERATED_AT)).toEqual(['planned']);
+  });
+
+  it('preserves mixed reason order for direct Due owners', () => {
+    expect(classifyAttentionReasons(rawTask({
+      taskStatus: 'DueSoon',
+      hasChildren: true,
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
+      effectiveFlagged: true,
+    }), GENERATED_AT)).toEqual(['dueSoon', 'flagged']);
+    expect(classifyAttentionReasons(rawTask({
+      taskStatus: 'Overdue',
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
+      plannedDate: EARLIER,
+      effectivePlannedDate: EARLIER,
+      effectiveFlagged: true,
+    }), GENERATED_AT)).toEqual(['overdue', 'planned', 'flagged']);
+  });
 });
 
-describe('Project Planned resolver and classifier', () => {
-  it('joins the canonical Project ID to its root Task and preserves date semantics', () => {
+describe('Project root semantics resolver and classifiers', () => {
+  it('joins the canonical Project ID and preserves Planned, Due, and native status', () => {
     const project = rawProject({ id: 'p1' });
-    const resolved = resolveProjectPlannedDates([
-      projectRoot(project, { plannedDate: EARLIER, effectivePlannedDate: LATER }),
+    const resolved = resolveProjectRootSemantics([
+      projectRoot(project, {
+        taskStatus: 'DueSoon',
+        plannedDate: EARLIER,
+        effectivePlannedDate: LATER,
+        dueDate: LATER,
+        effectiveDueDate: LATER,
+      }),
     ], [project]);
     expect(resolved.get('p1')).toEqual({
-      direct: EARLIER,
-      effective: LATER,
-      source: 'direct',
+      planned: { direct: EARLIER, effective: LATER, source: 'direct' },
+      due: { direct: LATER, effective: LATER, source: 'direct' },
+      taskStatus: 'DueSoon',
     });
   });
 
   it('rejects missing, wrong-kind, and duplicate roots', () => {
     const project = rawProject({ id: 'p1' });
-    expect(() => resolveProjectPlannedDates([], [project])).toThrow(/Missing Project root/);
-    expect(() => resolveProjectPlannedDates([
+    expect(() => resolveProjectRootSemantics([], [project])).toThrow(/Missing Project root/);
+    expect(() => resolveProjectRootSemantics([
       rawTask({ id: 'p1', isProjectRoot: false }),
     ], [project])).toThrow(/Missing Project root/);
-    expect(() => resolveProjectPlannedDates([
+    expect(() => resolveProjectRootSemantics([
       projectRoot(project),
       projectRoot(project),
     ], [project])).toThrow(/Duplicate Project root/);
@@ -346,6 +411,66 @@ describe('Project Planned resolver and classifier', () => {
   ] as const)('classifies Project Planned fixture %#', (planned, expected) => {
     const project = mapRawLeanProject(rawProject(), planned);
     expect(isProjectPlannedReady(project, GENERATED_AT)).toBe(expected);
+  });
+
+  it.each([
+    ['DueSoon', 'dueSoon'],
+    ['Overdue', 'overdue'],
+    ['Available', null],
+    ['Next', null],
+    ['Blocked', null],
+  ] as const)('classifies direct Project Due with native root status %s', (taskStatus, expected) => {
+    const project = mapRawLeanProject(rawProject({
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
+    }), NO_DATE);
+    expect(classifyProjectDeadline(project, {
+      planned: NO_DATE,
+      due: { direct: EARLIER, effective: EARLIER, source: 'direct' },
+      taskStatus,
+    })).toBe(expected);
+  });
+
+  it('does not infer Project deadline state from dates or inherited Due', () => {
+    const directProject = mapRawLeanProject(rawProject({
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
+    }), NO_DATE);
+    expect(classifyProjectDeadline(directProject, {
+      planned: NO_DATE,
+      due: { direct: EARLIER, effective: EARLIER, source: 'direct' },
+      taskStatus: 'Blocked',
+    })).toBeNull();
+
+    const inheritedProject = mapRawLeanProject(rawProject({ effectiveDueDate: EARLIER }), NO_DATE);
+    expect(classifyProjectDeadline(inheritedProject, {
+      planned: NO_DATE,
+      due: { direct: null, effective: EARLIER, source: 'inherited' },
+      taskStatus: 'DueSoon',
+    })).toBeNull();
+
+    const noDueProject = mapRawLeanProject(rawProject(), NO_DATE);
+    expect(classifyProjectDeadline(noDueProject, {
+      planned: NO_DATE,
+      due: NO_DATE,
+      taskStatus: 'DueSoon',
+    })).toBeNull();
+  });
+
+  it.each([
+    [{ direct: LATER, effective: EARLIER, source: 'direct' }],
+    [{ direct: EARLIER, effective: LATER, source: 'direct' }],
+    [{ direct: EARLIER, effective: EARLIER, source: 'inherited' }],
+  ] as const)('rejects Project/root Due mismatch %#', rootDue => {
+    const project = mapRawLeanProject(rawProject({
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
+    }), NO_DATE);
+    expect(() => classifyProjectDeadline(project, {
+      planned: NO_DATE,
+      due: rootDue,
+      taskStatus: 'DueSoon',
+    })).toThrow(/Due semantics mismatch/);
   });
 });
 
@@ -384,17 +509,27 @@ describe('snapshot sorting and composition', () => {
     expect(snapshot.inbox.items.map(task => task.id)).toEqual(['t1', 't2', 't3']);
   });
 
-  it('sorts direct due before inherited due before comparing effective dates', () => {
+  it('sorts direct Due Attention by direct date, then name and id', () => {
     const snapshot = composeLeanSnapshot({
       generatedAt: GENERATED_AT,
       limitPerSection: 10,
       projects: [],
       tasks: [
-        rawTask({ id: 'inherited', taskStatus: 'Overdue', effectiveDueDate: '2026-07-01T00:00:00Z' }),
-        rawTask({ id: 'direct', taskStatus: 'Overdue', dueDate: EARLIER, effectiveDueDate: EARLIER }),
+        rawTask({
+          id: 'later',
+          taskStatus: 'Overdue',
+          dueDate: EARLIER,
+          effectiveDueDate: EARLIER,
+        }),
+        rawTask({
+          id: 'earlier',
+          taskStatus: 'Overdue',
+          dueDate: '2026-07-01T00:00:00Z',
+          effectiveDueDate: '2026-07-01T00:00:00Z',
+        }),
       ],
     });
-    expect(snapshot.attention.items.map(item => item.task.id)).toEqual(['direct', 'inherited']);
+    expect(snapshot.attention.items.map(item => item.task.id)).toEqual(['earlier', 'later']);
   });
 
   it('sorts direct-planned owners by direct date and excludes inherited-only tasks', () => {
@@ -443,6 +578,8 @@ describe('snapshot sorting and composition', () => {
       id: 'multi',
       inInbox: true,
       taskStatus: 'Overdue',
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
       plannedDate: EARLIER,
       effectivePlannedDate: EARLIER,
       effectiveFlagged: true,
@@ -543,6 +680,152 @@ describe('snapshot sorting and composition', () => {
     expect(snapshot.attention.byReason.planned).toBe(0);
   });
 
+  it('represents Weekly Review direct DueSoon once without inherited child fan-out', () => {
+    const project = rawProject({
+      id: 'weekly',
+      name: 'Weekly Review',
+      dueDate: LATER,
+      effectiveDueDate: LATER,
+      totalTaskCount: 8,
+      taskStatusCounts: {
+        ...rawProject().taskStatusCounts,
+        available: 0,
+        dueSoon: 8,
+      },
+    });
+    const children = Array.from({ length: 8 }, (_, index) => rawTask({
+      id: `weekly-due-child-${index}`,
+      name: `Child ${index}`,
+      taskStatus: 'DueSoon',
+      projectId: project.id,
+      projectName: project.name,
+      effectiveDueDate: LATER,
+      effectivePlannedDate: EARLIER,
+    }));
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects: [project],
+      tasks: [
+        projectRoot(project, {
+          taskStatus: 'DueSoon',
+          dueDate: LATER,
+          effectiveDueDate: LATER,
+          plannedDate: EARLIER,
+          effectivePlannedDate: EARLIER,
+        }),
+        ...children,
+      ],
+    });
+
+    expect(snapshot.projects.active.items.map(item => item.id)).toEqual(['weekly']);
+    expect(snapshot.projects.planned.items.map(item => item.id)).toEqual(['weekly']);
+    expect(snapshot.projects.deadline).toMatchObject({ total: 1, returned: 1, truncated: false });
+    expect(snapshot.projects.deadline.items).toEqual([{
+      project: snapshot.projects.active.items[0],
+      state: 'dueSoon',
+    }]);
+    expect(snapshot.projects.deadline.items[0].project.tasks).toEqual({
+      total: 8,
+      byStatus: project.taskStatusCounts,
+    });
+    expect(snapshot.attention).toMatchObject({
+      total: 0,
+      byReason: { overdue: 0, dueSoon: 0, planned: 0, flagged: 0 },
+    });
+  });
+
+  it('represents a direct Project Overdue once without inherited child fan-out', () => {
+    const project = rawProject({
+      id: 'overdue-project',
+      dueDate: EARLIER,
+      effectiveDueDate: EARLIER,
+      totalTaskCount: 8,
+      taskStatusCounts: {
+        ...rawProject().taskStatusCounts,
+        available: 0,
+        overdue: 8,
+      },
+    });
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects: [project],
+      tasks: [
+        projectRoot(project, {
+          taskStatus: 'Overdue',
+          dueDate: EARLIER,
+          effectiveDueDate: EARLIER,
+        }),
+        ...Array.from({ length: 8 }, (_, index) => rawTask({
+          id: `overdue-child-${index}`,
+          taskStatus: 'Overdue',
+          projectId: project.id,
+          projectName: project.name,
+          effectiveDueDate: EARLIER,
+        })),
+      ],
+    });
+
+    expect(snapshot.projects.deadline.items.map(item => ({
+      id: item.project.id,
+      state: item.state,
+    }))).toEqual([{ id: project.id, state: 'overdue' }]);
+    expect(snapshot.attention.total).toBe(0);
+    expect(snapshot.attention.byReason.overdue).toBe(0);
+  });
+
+  it('preserves nested direct Due owners by identity without timestamp deduplication', () => {
+    const project = rawProject({
+      id: 'nested-project',
+      dueDate: LATER,
+      effectiveDueDate: LATER,
+    });
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects: [project],
+      tasks: [
+        projectRoot(project, {
+          taskStatus: 'DueSoon',
+          dueDate: LATER,
+          effectiveDueDate: LATER,
+        }),
+        rawTask({
+          id: 'group-owner',
+          name: 'Group',
+          hasChildren: true,
+          taskStatus: 'DueSoon',
+          dueDate: LATER,
+          effectiveDueDate: LATER,
+          projectId: project.id,
+          projectName: project.name,
+        }),
+        rawTask({
+          id: 'leaf-owner',
+          name: 'Leaf',
+          taskStatus: 'DueSoon',
+          dueDate: LATER,
+          effectiveDueDate: LATER,
+          projectId: project.id,
+          projectName: project.name,
+        }),
+        rawTask({
+          id: 'inherited-child',
+          taskStatus: 'DueSoon',
+          effectiveDueDate: LATER,
+          projectId: project.id,
+          projectName: project.name,
+        }),
+      ],
+    });
+
+    expect(snapshot.projects.deadline.items.map(item => item.project.id)).toEqual([project.id]);
+    expect(snapshot.attention.items.map(item => item.task.id)).toEqual(['group-owner', 'leaf-owner']);
+    expect(snapshot.attention.items.map(item => item.task.kind)).toEqual(['action_group', 'action']);
+    expect(snapshot.attention.byReason.dueSoon).toBe(2);
+  });
+
   it('derives planned Projects from the full Active set before independent truncation', () => {
     const projects = Array.from({ length: 30 }, (_, index) => rawProject({
       id: `p-${String(index).padStart(2, '0')}`,
@@ -563,6 +846,60 @@ describe('snapshot sorting and composition', () => {
     expect(snapshot.projects.active.items.map(item => item.id)).not.toContain(plannedId);
     expect(snapshot.projects.planned).toMatchObject({ total: 1, returned: 1, truncated: false });
     expect(snapshot.projects.planned.items.map(item => item.id)).toEqual([plannedId]);
+  });
+
+  it('derives deadline Projects from the full Active set before independent truncation', () => {
+    const projects = Array.from({ length: 30 }, (_, index) => rawProject({
+      id: `deadline-${String(index).padStart(2, '0')}`,
+      name: `Project ${String(index).padStart(2, '0')}`,
+      ...(index === 29 ? { dueDate: LATER, effectiveDueDate: LATER } : {}),
+    }));
+    const deadlineId = 'deadline-29';
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects,
+      tasks: projects.map(project => projectRoot(project, project.id === deadlineId
+        ? { taskStatus: 'DueSoon', dueDate: LATER, effectiveDueDate: LATER }
+        : {})),
+    });
+
+    expect(snapshot.projects.active).toMatchObject({ total: 30, returned: 25, truncated: true });
+    expect(snapshot.projects.active.items.map(item => item.id)).not.toContain(deadlineId);
+    expect(snapshot.projects.deadline).toMatchObject({ total: 1, returned: 1, truncated: false });
+    expect(snapshot.projects.deadline.items.map(item => item.project.id)).toEqual([deadlineId]);
+  });
+
+  it('sorts and truncates Project deadlines independently', () => {
+    const configs = [
+      { id: 'due-b', name: 'B', status: 'DueSoon' as const, date: LATER },
+      { id: 'overdue-later', name: 'A', status: 'Overdue' as const, date: EARLIER },
+      { id: 'due-a', name: 'A', status: 'DueSoon' as const, date: LATER },
+      { id: 'overdue-earlier', name: 'Z', status: 'Overdue' as const, date: '2026-07-08T00:00:00Z' },
+    ];
+    const projects = configs.map(config => rawProject({
+      id: config.id,
+      name: config.name,
+      dueDate: config.date,
+      effectiveDueDate: config.date,
+    }));
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 3,
+      projects,
+      tasks: projects.map((project, index) => projectRoot(project, {
+        taskStatus: configs[index].status,
+        dueDate: configs[index].date,
+        effectiveDueDate: configs[index].date,
+      })),
+    });
+
+    expect(snapshot.projects.deadline).toMatchObject({ total: 4, returned: 3, truncated: true });
+    expect(snapshot.projects.deadline.items.map(item => item.project.id)).toEqual([
+      'overdue-earlier',
+      'overdue-later',
+      'due-a',
+    ]);
   });
 
   it('sorts planned Projects by direct date, then UTF-16 name and id', () => {
@@ -644,6 +981,7 @@ describe('snapshot sorting and composition', () => {
       projects: {
         active: { total: 0, returned: 0, truncated: false, items: [] },
         planned: { total: 0, returned: 0, truncated: false, items: [] },
+        deadline: { total: 0, returned: 0, truncated: false, items: [] },
       },
       attention: { total: 0, returned: 0, truncated: false, items: [] },
       inbox: { total: 0, returned: 0, truncated: false, items: [] },
