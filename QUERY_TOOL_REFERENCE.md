@@ -1,238 +1,242 @@
-# Query OmniFocus Tool - Complete Reference Guide
+# `query_omnifocus` 当前实现参考
 
-## Complete Field Reference
+本文档以当前 `src/tools/definitions/queryOmnifocus.ts` 和
+`src/tools/primitives/queryOmnifocus.ts` 为准。
 
-### Task Fields
-All available fields you can request for tasks:
+`query_omnifocus` 是 upstream-compatible generic read Tool，适合特定筛选、候选发现和
+Tag/Folder 等通用查询。它返回格式化文本，不是稳定的个性化 Domain JSON Contract。
+全局当前状态、单 Task、单 Project 和完成历史应优先使用：
 
-| Field | Type | Description | Example Value |
-|-------|------|-------------|---------------|
-| `id` | string | Unique identifier | "abc123def456" |
-| `name` | string | Task name/title | "Review quarterly report" |
-| `note` | string | Task notes/description | "Check financial section" |
-| `flagged` | boolean | Whether task is flagged | true |
-| `taskStatus` | string | Current status | "Next", "Available", "Blocked" |
-| `dueDate` | string | Due date in ISO format | "2024-12-25T00:00:00Z" |
-| `deferDate` | string | Defer/start date in ISO format | "2024-12-20T00:00:00Z" |
-| `plannedDate` | string | Planned date in ISO format | "2024-12-22T00:00:00Z" |
-| `effectiveDueDate` | string | Inherited or set due date | "2024-12-25T00:00:00Z" |
-| `effectiveDeferDate` | string | Inherited or set defer date | "2024-12-20T00:00:00Z" |
-| `effectivePlannedDate` | string | Inherited or set planned date | "2024-12-22T00:00:00Z" |
-| `completionDate` | string | When task was completed | "2024-12-24T14:30:00Z" |
-| `estimatedMinutes` | number | Time estimate in minutes | 30 |
-| `tagNames` | string[] | Array of tag names | ["work", "urgent"] |
-| `tags` | string[] | Array of tag IDs | ["tag1id", "tag2id"] |
-| `projectName` | string | Name of containing project | "Q4 Goals" |
-| `projectId` | string | ID of containing project | "proj123" |
-| `parentId` | string | ID of parent task (for subtasks) | "task456" |
-| `childIds` | string[] | IDs of child tasks | ["task789", "task012"] |
-| `hasChildren` | boolean | Whether task has subtasks | true |
-| `sequential` | boolean | Whether subtasks are sequential | false |
-| `completedByChildren` | boolean | Auto-complete when children done | true |
-| `inInbox` | boolean | Whether task is in inbox | false |
-| `modificationDate` | string | Last modified date | "2024-12-20T10:00:00Z" |
-| `creationDate` | string | When task was created | "2024-12-01T09:00:00Z" |
+- `get_lean_snapshot`
+- `get_task`
+- `get_project`
+- `get_completed_since`
 
-### Project Fields
-All available fields you can request for projects:
+## 1. 顶层参数
 
-| Field | Type | Description | Example Value |
-|-------|------|-------------|---------------|
-| `id` | string | Unique identifier | "proj123" |
-| `name` | string | Project name | "Website Redesign" |
-| `status` | string | Project status | "Active", "OnHold" |
-| `note` | string | Project notes | "Phase 1 focus on UX" |
-| `folderName` | string | Containing folder name | "Work" |
-| `folderID` | string | Containing folder ID | "fold456" |
-| `sequential` | boolean | Tasks must be done in order | true |
-| `dueDate` | string | Project due date | "2024-12-31T00:00:00Z" |
-| `deferDate` | string | Project defer date | "2024-12-01T00:00:00Z" |
-| `effectiveDueDate` | string | Inherited or set due date | "2024-12-31T00:00:00Z" |
-| `effectiveDeferDate` | string | Inherited or set defer date | "2024-12-01T00:00:00Z" |
-| `completedByChildren` | boolean | Auto-complete when tasks done | false |
-| `containsSingletonActions` | boolean | Has single action list | true |
-| `taskCount` | number | Number of tasks in project | 15 |
-| `tasks` | string[] | Array of task IDs | ["task1", "task2"] |
-| `modificationDate` | string | Last modified date | "2024-12-20T10:00:00Z" |
-| `creationDate` | string | When project was created | "2024-11-01T09:00:00Z" |
+| 参数 | 类型 | 当前行为 |
+|---|---|---|
+| `entity` | `tasks \| projects \| folders` | 必填，选择查询实体 |
+| `filters` | object | 可选；不同 filter 之间使用 AND |
+| `fields` | `string[]` | 可选；投影指定字段 |
+| `limit` | number | 可选；在字段映射前截断结果 |
+| `sortBy` | string | 可选；直接读取 Raw item 上的同名属性排序 |
+| `sortOrder` | `asc \| desc` | 可选，默认 `asc` |
+| `includeCompleted` | boolean | 默认 `false`；排除 completed/dropped Task，以及 Done/Dropped Project 或位于 Dropped ancestor Folder 下的 Project |
+| `summary` | boolean | 默认 `false`；为 `true` 时只返回格式化 count 文本 |
 
-### Folder Fields
-All available fields you can request for folders:
+`filters` 之间使用 AND；`tags` 和 `status` 数组内部使用 OR。
 
-| Field | Type | Description | Example Value |
-|-------|------|-------------|---------------|
-| `id` | string | Unique identifier | "fold123" |
-| `name` | string | Folder name | "Personal" |
-| `path` | string | Full folder path | "Life/Personal" |
-| `parentFolderID` | string | Parent folder ID | "fold000" |
-| `status` | string | Folder status | "Active", "Dropped" |
-| `projectCount` | number | Number of projects | 8 |
-| `projects` | string[] | Array of project IDs | ["proj1", "proj2"] |
-| `subfolders` | string[] | Array of subfolder IDs | ["fold456", "fold789"] |
+## 2. 可请求字段
 
-## Filter Behavior Details
+日期字段通常返回 ISO datetime string 或 `null`。如果请求一个没有显式 mapping、且 Raw
+item 上也不存在的字段，当前 fallback 返回 `null`，不会返回 `undefined`，也不会报错。
 
-### `projectName` Filter
-- **Behavior**: Case-insensitive partial/substring matching
-- **Special value**: Use `"inbox"` to get inbox tasks
-```json
-{
-  "projectName": "review"  // Matches "Weekly Review", "Review Documents", etc.
-}
+### Task fields
+
+| 类别 | 字段 |
+|---|---|
+| Identity/content | `id`, `name`, `note`, `hasNote` |
+| Status | `taskStatus`, `completed`, `flagged`, `effectiveFlagged` |
+| Completion/drop | `completionDate`, `effectiveCompletedDate`, `dropDate`, `effectiveDropDate` |
+| Dates | `dueDate`, `effectiveDueDate`, `deferDate`, `effectiveDeferDate`, `plannedDate`, `effectivePlannedDate` |
+| Organization | `tagNames`, `tags`, `projectName`, `projectId`, `inInbox` |
+| Kind/hierarchy facts | `isProjectRoot`, `parentId`, `childIds`, `hasChildren`, `sequential`, `completedByChildren` |
+| Repeat/estimate | `isRepeating`, `repetitionRule`, `estimatedMinutes` |
+| Timestamps | `creationDate`（或 `added`）, `modificationDate`（或 `modified`） |
+
+说明：
+
+- Task `projectId` 映射为 containing Project 的 canonical root Task ID。
+- `projectName` 对 Inbox Task 返回兼容展示值 `"Inbox"`。
+- 这些字段是 generic projection，不等同于 `TaskView`；例如不会自动生成完整
+  direct/effective/source Domain semantics。
+
+### Project fields
+
+| 类别 | 字段 |
+|---|---|
+| Identity/content | `id`, `name`, `note`, `status` |
+| Folder | `folderId`, `folderName`, `folderID` |
+| Behavior | `sequential`, `flagged`, `completedByChildren`, `containsSingletonActions` |
+| Dates/events | `dueDate`, `effectiveDueDate`, `deferDate`, `effectiveDeferDate`, `completionDate`, `dropDate`, `effectiveDropDate` |
+| Task aggregate | `directTaskIds`, `taskIds`, `taskStatusCounts`, `taskCount`, `tasks`, `totalTaskCount` |
+| Review | `nextReviewDate`, `reviewInterval` |
+| Timestamps | `creationDate`, `modificationDate` |
+
+说明：
+
+- Project `id` 映射为 `item.task.id.primaryKey`，即 canonical Project root Task ID。
+- `directTaskIds` 来自 `item.tasks`；`taskIds` 和 `totalTaskCount` 来自
+  `item.flattenedTasks`。
+- `taskStatusCounts` 包含 `available`, `next`, `blocked`, `dueSoon`, `overdue`,
+  `completed`, `dropped`。
+- `taskCount`/`tasks` 只表示 direct Tasks；它们不等于完整 `ProjectView.tasks` Contract。
+
+### Folder fields
+
+- `id`
+- `name`
+- `path`
+- `parentFolderID`
+- `status`
+- `projectCount`
+- `projects`
+- `subfolders`
+
+## 3. Filters
+
+### Identity 与名称
+
+| Filter | 适用实体 | 当前行为 |
+|---|---|---|
+| `taskId` | tasks | exact Task ID |
+| `taskNameExact` | tasks | 区分大小写 exact match |
+| `taskName` | tasks | 不区分大小写 substring match |
+| `projectId` | tasks/projects | 兼容 canonical root Task ID 与 OmniJS Project ID |
+| `projectNameExact` | projects | 区分大小写 exact match |
+| `projectName` | tasks/projects | 不区分大小写 substring match；tasks 中 `"inbox"` 为特殊值 |
+| `folderId` | tasks/projects | 匹配目标 Folder 及其 descendant Folders |
+
+### Tag、状态与布尔条件
+
+| Filter | 适用实体 | 当前行为 |
+|---|---|---|
+| `tags` | tasks | Tag name exact、区分大小写；数组内部 OR |
+| `status` | tasks/projects | status exact、区分大小写；数组内部 OR |
+| `flagged` | tasks | 检查 direct `item.flagged` |
+| `hasNote` | tasks | trim 后检查 note 是否非空 |
+| `inbox` | tasks | 按 `item.inInbox` 过滤 |
+| `isRepeating` | tasks | 根据 `repetitionRule !== null` 判断 |
+| `reviewDue` | projects | 根据 `nextReviewDate` 与今天 23:59:59.999 比较 |
+
+### Date filters
+
+Tool definition 接受 number、`today`、`tomorrow`、`this week`、`next week` 或
+`YYYY-MM-DD` 的 filters：
+
+- `dueWithin`
+- `deferredUntil`
+- `plannedWithin`
+- `dueOn`
+- `deferOn`
+- `plannedOn`
+
+String 会先转换为 days-from-now number：`today=0`、`tomorrow=1`、
+`this week=7`、`next week=14`。
+
+#### `dueWithin` / `plannedWithin` / `deferredUntil` 的真实边界
+
+三者都已经实现。当前 primitive 采用相同的 upper-bound 检查：
+
+```text
+item date exists
+AND item date <= now + N days
 ```
 
-### `deferredUntil` Filter
-- **Status**: Accepted in schema but **not yet implemented** — the filter is silently ignored
-- **Intended behavior**: Return tasks currently deferred but becoming available within N days
+当前实现没有 lower-bound 检查。因此：
 
-### `dueWithin` Filter
-- **Behavior**: Returns tasks due from now until N days in the future (inclusive)
-- **Example**: `"dueWithin": 7` returns tasks due today through 7 days from now
-```json
-{
-  "dueWithin": 1  // Tasks due today or tomorrow
-}
-```
+- `dueWithin: 7` 会包含 7 天边界以前的 Due，包括 overdue dates。
+- `plannedWithin: 7` 会包含边界以前的 Planned，包括已过去的 Planned dates。
+- `deferredUntil: 7` 会包含边界以前的 Defer，包括已经过去的 Defer dates；当前代码不额外验证 Task 是否“仍处于 deferred 状态”。
 
-### `plannedWithin` Filter
-- **Behavior**: Returns tasks planned from now until N days in the future (inclusive)
-- **Example**: `"plannedWithin": 7` returns tasks planned today through 7 days from now
-```json
-{
-  "plannedWithin": 7  // Tasks planned within next week
-}
-```
+这与 schema 中“from TODAY”或“CURRENTLY DEFERRED”的理想化描述不同。需要 exact-day
+语义时使用 `dueOn`、`plannedOn` 或 `deferOn`。
 
-### `tags` Filter
-- **Behavior**: Exact match, case-sensitive
-- **Logic**: OR - task must have at least ONE of the specified tags
-```json
-{
-  "tags": ["Work", "work"]  // Different - case matters!
-}
-```
+#### 其他 date filters
 
-### `status` Filter
-- **Behavior**: Exact match against OmniFocus status values
-- **Logic**: OR - item must have ONE of the specified statuses
-```json
-{
-  "status": ["Next", "Available"]  // Tasks that are either next or available
-}
-```
+| Filter | 当前行为 |
+|---|---|
+| `dueOn`, `deferOn`, `plannedOn` | 与目标 calendar day 精确匹配 |
+| `addedWithin` | `added >= 当天零点 - N days` |
+| `addedOn` | 与 days-from-now 对应 calendar day 精确匹配 |
+| `completedWithin` | direct `completionDate` 位于过去 N 天范围 |
+| `completedOn` | direct `completionDate` 与目标 calendar day 匹配 |
+| `droppedWithin` | direct `dropDate` 位于过去 N 天范围 |
+| `droppedOn` | direct `dropDate` 与目标 calendar day 匹配 |
 
-### `hasNote` Filter
-- **Behavior**: Checks if note field exists and is non-empty (after trimming whitespace)
-```json
-{
-  "hasNote": true   // Tasks with non-empty notes
-  "hasNote": false  // Tasks with no notes or only whitespace
-}
-```
+`completedWithin`/`completedOn` 和 dropped filters 通常需要配合
+`includeCompleted: true`，否则 completed/dropped items 会在 filter 前被排除。
 
-## Complete Status Values
+`completedSince` 和 `completedUntil` 存在于内部 primitive contract，供
+`get_completed_since` 使用；它们不是公开 `query_omnifocus` schema 参数。
 
-### Task Status Values
-| Status | Description | When it appears |
-|--------|-------------|-----------------|
-| `Next` | Next action in sequential list | First available task in sequential project/group |
-| `Available` | Ready to work on | Task with no blockers, not sequential or is current in sequence |
-| `Blocked` | Waiting on something | Task in sequential list waiting for previous task |
-| `DueSoon` | Due within 24 hours | Task due soon (configurable in OF preferences) |
-| `Overdue` | Past due date | Task whose due date has passed |
-| `Completed` | Marked complete | Task that has been completed |
-| `Dropped` | Cancelled/dropped | Task that was dropped (not completed) |
+## 4. Status values
 
-### Project Status Values
-| Status | Description |
-|--------|-------------|
-| `Active` | Normal active project |
-| `OnHold` | Paused/on hold project |
-| `Done` | Completed project |
-| `Dropped` | Cancelled/dropped project |
+### Task
 
-### Folder Status Values
-| Status | Description |
-|--------|-------------|
-| `Active` | Normal active folder |
-| `Dropped` | Dropped/hidden folder |
+- `Next`
+- `Available`
+- `Blocked`
+- `DueSoon`
+- `Overdue`
+- `Completed`
+- `Dropped`
 
-## Filter Combination Logic
+### Project
 
-All filters use **AND** logic - an item must match ALL specified filters:
+- `Active`
+- `OnHold`
+- `Done`
+- `Dropped`
+
+`DueSoon`/`Overdue` 是 OmniFocus native status。本 generic Tool 不提供 Lean Snapshot 的
+direct-owner Attention semantics。
+
+## 5. Sorting
+
+当前 sort 在字段映射之前直接读取 Raw item 的 `item[sortBy]`：
+
+- `name`
+- `dueDate`
+- `deferDate`
+- `plannedDate`
+- `estimatedMinutes`
+- `taskStatus`
+
+这些与 Raw property 同名的字段可直接排序。Null/undefined 永远排在最后；
+`sortOrder` 不改变 null-last 规则。
+
+实现限制：输出字段 `modificationDate`/`creationDate` 分别映射自 OmniFocus Raw
+`modified`/`added`，但 sort 当前不会转换这两个 alias。因此传入
+`sortBy: "modificationDate"` 或 `sortBy: "creationDate"` 虽能通过 schema，排序可能不会
+按预期生效。文档示例不再依赖这两个 sort alias。
+
+## 6. Output contract
+
+- `summary: true` 返回 `Found N <entity> matching your criteria.` 文本。
+- 普通查询将 projected items 格式化成人类可读文本。
+- 即使指定 `fields`，MCP Tool handler 也不会返回 field-by-field JSON array。
+- Primitive 内部返回 `{items, count}`，但这是内部接口，不是公开 MCP Tool Contract。
+- `items.length === limit` 时会显示“可能还有更多结果”的提示。
+
+需要稳定 Domain JSON 时，使用个性化 Domain Tool。
+
+## 7. 常见注意事项
+
+1. Tag name exact 且区分大小写：`Work` 与 `work` 不同。
+2. `projectName`/`taskName` 是 partial match；exact 版本是独立 filters。
+3. `projectName: "inbox"` 是 tasks query 的特殊值。
+4. Status values 区分大小写。
+5. 未知字段通常返回 `null`，不会因字段名错误而失败。
+6. `includeCompleted` 默认 `false`。
+7. `Within` date filters 当前只有 upper bound，不是严格的“从今天开始”范围。
+8. `query_omnifocus` 不应被用来重新实现 Lean Snapshot 或 direct-owner semantics。
+
+## 8. 最小充分查询
 
 ```json
 {
   "entity": "tasks",
   "filters": {
-    "flagged": true,        // AND
-    "status": ["Next"],     // AND
-    "tags": ["urgent"]      // AND
-  }
-}
-// Returns: Flagged tasks that are Next actions with "urgent" tag
-```
-
-Within array filters (`status`, `tags`), **OR** logic applies:
-```json
-{
-  "status": ["Next", "Available"],  // Next OR Available
-  "tags": ["home", "errands"]       // has "home" OR "errands"
-}
-```
-
-## Sort Fields
-
-Common fields you can sort by:
-- `name` - Alphabetical by item name
-- `dueDate` - By due date (null dates sort last)
-- `deferDate` - By defer date (null dates sort last)
-- `plannedDate` - By planned date (null dates sort last)
-- `modificationDate` - By last modified time
-- `creationDate` - By creation time
-- `estimatedMinutes` - By time estimate (shortest first with 'asc')
-- `taskStatus` - Groups by status
-
-## Performance Tips
-
-### Request only needed fields
-```json
-{
-  "entity": "tasks",
-  "fields": ["name", "dueDate", "flagged"],  // Only get 3 fields instead of all
-  "limit": 50
-}
-```
-
-### Use summary for counts
-```json
-{
-  "entity": "tasks",
-  "filters": {"projectName": "Big Project"},
-  "summary": true  // Returns just count, not full task details
-}
-```
-
-### Combine related queries
-Instead of multiple queries, get everything at once:
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "status": ["Next", "Available", "DueSoon", "Overdue"],
-    "flagged": true
+    "tags": ["Work"],
+    "status": ["Next", "Available"]
   },
-  "fields": ["name", "dueDate", "projectName", "taskStatus"],
-  "sortBy": "dueDate"
+  "fields": ["id", "name", "taskStatus", "projectName"],
+  "limit": 25,
+  "sortBy": "name",
+  "sortOrder": "asc"
 }
 ```
 
-## Common Gotchas
-
-1. **Tag names must be exact** - "Work" ≠ "work"
-2. **Project names are partial matches** - "Review" matches "Weekly Review"
-3. **Null dates sort last** - Tasks without due dates appear at the end when sorting by dueDate
-4. **Inbox is a special project name** - Use `"projectName": "inbox"` for inbox tasks
-5. **Status values are case-sensitive** - Use exact values like "Next", not "next"
-6. **Fields that don't exist return undefined** - Requesting invalid fields won't error but returns undefined
-7. **`deferredUntil` is not yet implemented** - The filter is accepted but silently ignored
+只请求回答问题所需的 fields 和数量。不要为了“完整”而默认使用 `dump_database`。

@@ -744,10 +744,26 @@ README / Architecture Audit
 3. 以真实代码和测试描述当前行为。
 4. 若差异涉及已接受决策，应单独评审代码或 ADR，而不是在本指南中自行发明新规则。
 
-### 当前已知文档差异
+### 当前文档一致性与实现边界
 
-1. `QUERY_TOOL_REFERENCE.md` 和 `QUERY_TOOL_EXAMPLES.md` 声称 `deferredUntil` 尚未实现并会被静默忽略；当前 `src/tools/primitives/queryOmnifocus.ts` 已实际生成 `deferDate` filter condition，因此该说明已过时。
-2. `PERSONALIZATION.md` 将 Full Snapshot workflow 列为目标方向，但 Accepted ADR-004 已进一步冻结为：当前低频需求使用手动/plugin/file 导出 + AI 分析，暂缓 Full Snapshot MCP，直到出现明确且重复的个人需求。
-3. `package.json` 和 MCP Server 报告的版本仍为 upstream `1.9.2`；`v1.0-personalized` 是文档与架构 release label，不是当前 package version。
-4. Domain Tool 的 Adapter/Contract failure 与 OmniFocus/bridge execution failure 最终都可能映射为 `query_failed`；当前不存在分别命名的公开 error code，GPT 必须结合错误消息区分。
-5. Server 仍注册 7 个 mutation tools。任何“默认只读”描述都是个人化使用契约与客户端 exposure policy，不是 Server-wide 技术隔离。
+本次文档校准已完成：
+
+- `QUERY_TOOL_REFERENCE.md` 和 `QUERY_TOOL_EXAMPLES.md` 已按当前代码更新，明确
+  `deferredUntil` 已实现，并记录 `dueWithin`、`plannedWithin`、`deferredUntil` 只有
+  upper bound 等实际限制。
+- `PERSONALIZATION.md` 已与 Accepted ADR-004 对齐：当前低频 Full Snapshot 需求使用
+  手动/plugin/file 导出 + AI 分析，暂缓 Full Snapshot MCP，直到出现明确且重复的个人
+  需求。
+- 当前 README、Architecture Audit、Accepted ADR、Query 文档、`PERSONALIZATION.md` 与
+  本指南在个性化 Domain Tool、direct-owner semantics 和 Full Snapshot 边界上没有已知
+  核心冲突。
+
+仍需保留的实现边界：
+
+1. `package.json` 和 MCP Server 报告的版本仍为 upstream `1.9.2`；
+   `v1.0-personalized` 是文档与架构 release label，不是当前 package version。
+2. Domain Tool 的 Adapter/Contract failure 与 OmniFocus/bridge execution failure 最终都
+   可能映射为 `query_failed`；当前不存在分别命名的公开 error code，GPT 必须结合错误
+   消息区分。
+3. Server 仍注册 7 个 mutation tools。任何“默认只读”描述都是个人化使用 Contract 与
+   客户端 exposure policy，不是 Server-wide 技术隔离。

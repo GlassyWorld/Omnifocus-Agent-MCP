@@ -1,357 +1,267 @@
-# Query OmniFocus Tool - Usage Examples
+# `query_omnifocus` 当前用法示例
 
-The `query_omnifocus` tool provides efficient, targeted queries against your OmniFocus database without loading everything into memory. This is much more context-efficient than using `dump_database`.
+`query_omnifocus` 用于四个个性化 Domain Tool 无法表达的特定筛选。它返回格式化文本，
+不是稳定 Domain JSON。全局状态优先使用 `get_lean_snapshot`；单对象优先使用
+`get_task`/`get_project`；完成历史优先使用 `get_completed_since`。
 
-## Basic Usage
+## 1. Basic queries
 
-### Get all flagged tasks
+### Flagged Tasks
+
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "flagged": true
-  }
+  "filters": { "flagged": true },
+  "fields": ["id", "name", "taskStatus", "projectName"],
+  "limit": 25
 }
 ```
 
-### Get tasks due in the next 7 days
-```json
-{
-  "entity": "tasks", 
-  "filters": {
-    "dueWithin": 7
-  }
-}
-```
+### Next Actions
 
-### Get next actions only
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "status": ["Next"]
-  }
+  "filters": { "status": ["Next"] },
+  "fields": ["id", "name", "projectName", "tagNames"]
 }
 ```
 
-### Get inbox tasks
+### Inbox Tasks
+
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "projectName": "inbox"
-  }
+  "filters": { "projectName": "inbox" },
+  "fields": ["id", "name", "note", "dueDate", "tagNames"]
 }
 ```
 
-## Advanced Filtering
+## 2. Date queries
 
-### Get flagged tasks due this week with specific tags
+### Due no later than 7 days from now
+
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "flagged": true,
-    "dueWithin": 7,
-    "tags": ["important", "work"]
-  },
+  "filters": { "dueWithin": 7 },
+  "fields": ["id", "name", "dueDate", "taskStatus", "projectName"],
   "sortBy": "dueDate",
   "sortOrder": "asc"
 }
 ```
 
-### Get overdue and due soon tasks
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "status": ["Overdue", "DueSoon"]
-  },
-  "sortBy": "dueDate"
-}
-```
+注意：当前 `dueWithin` 只有 upper bound，因此也会包含 overdue dates。它不是严格的
+“从今天到未来 7 天”范围。
 
-### Get tasks in a specific project
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "projectName": "Weekly Review"
-  }
-}
-```
+### Planned exactly today
 
-### Get tasks that will become available in the next 3 days
-> **Note:** The `deferredUntil` filter is accepted but not yet implemented — this query will return all tasks unfiltered. Use `deferOn` for exact-day matching instead.
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "deferredUntil": 3
-  }
-}
-```
-
-### Get tasks planned for this week
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "plannedWithin": 7
-  },
+  "filters": { "plannedOn": "today" },
+  "fields": ["id", "name", "plannedDate", "taskStatus", "projectName"],
   "sortBy": "plannedDate"
 }
 ```
 
-### Get today's planned work
+需要“今天”时使用 `plannedOn`。`plannedWithin: 0` 的当前实现会匹配所有不晚于当前边界
+的 Planned dates，包括过去日期。
+
+### Defer date no later than 3 days from now
+
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "plannedWithin": 0,
-    "status": ["Next", "Available"]
-  }
+  "filters": { "deferredUntil": 3 },
+  "fields": ["id", "name", "deferDate", "taskStatus", "projectName"],
+  "sortBy": "deferDate"
 }
 ```
 
-### Get tasks with notes
+`deferredUntil` 已实现，不会被静默忽略。当前实现检查 `deferDate <= now + 3 days`，但没有
+lower bound，也不额外验证 Task 是否仍处于 deferred 状态。
+
+### Exact Due day
+
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "hasNote": true
-  },
-  "fields": ["name", "note", "projectName"]
+  "filters": { "dueOn": "tomorrow" },
+  "fields": ["id", "name", "dueDate", "projectName"]
 }
 ```
 
-### Get tasks without notes (for review)
+## 3. Tag and Folder queries
+
+### Tasks with an exact Tag
+
 ```json
 {
   "entity": "tasks",
   "filters": {
-    "hasNote": false,
-    "status": ["Available", "Next"]
-  },
-  "sortBy": "modificationDate"
-}
-```
-
-## Performance Optimization
-
-### Get only specific fields (reduces response size)
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "flagged": true
-  },
-  "fields": ["name", "note", "dueDate", "projectName"],
-  "limit": 10
-}
-```
-
-### Get just a count of matching items
-```json
-{
-  "entity": "tasks",
-  "filters": {
+    "tags": ["Work"],
     "status": ["Next", "Available"]
   },
-  "summary": true
+  "fields": ["id", "name", "taskStatus", "projectName", "tagNames"],
+  "limit": 30,
+  "sortBy": "name"
 }
 ```
 
-### Limit results for large queries
+Tag names exact 且区分大小写。
+
+### Projects in a Folder tree
+
 ```json
 {
-  "entity": "tasks",
-  "filters": {
-    "tags": ["someday"]
-  },
+  "entity": "projects",
+  "filters": { "folderId": "FOLDER_ID" },
+  "fields": ["id", "name", "status", "folderId", "folderName"]
+}
+```
+
+`folderId` 会匹配目标 Folder 及其 descendant Folders。
+
+### Folder structure
+
+```json
+{
+  "entity": "folders",
+  "fields": ["id", "name", "path", "parentFolderID", "projectCount", "subfolders"]
+}
+```
+
+## 4. Project queries
+
+### Active Projects
+
+```json
+{
+  "entity": "projects",
+  "filters": { "status": ["Active"] },
+  "fields": ["id", "name", "status", "folderName", "taskStatusCounts"],
+  "sortBy": "name"
+}
+```
+
+若问题是单个 Project 的 Domain 状态，应改用 `get_project`。
+
+### Project name candidate discovery
+
+```json
+{
+  "entity": "projects",
+  "filters": { "projectName": "review" },
+  "fields": ["id", "name", "status", "folderName"],
   "limit": 20,
-  "sortBy": "modificationDate",
+  "sortBy": "name"
+}
+```
+
+`projectName` 是不区分大小写的 partial match。候选确认后，使用 canonical ID 调用
+`get_project` 获取稳定 Domain View。
+
+### Projects due for review
+
+```json
+{
+  "entity": "projects",
+  "filters": { "reviewDue": true },
+  "fields": ["id", "name", "nextReviewDate", "reviewInterval", "folderName"],
+  "sortBy": "name"
+}
+```
+
+## 5. Completed and dropped queries
+
+### Completed Tasks in the past 7 days
+
+```json
+{
+  "entity": "tasks",
+  "filters": { "completedWithin": 7 },
+  "fields": ["id", "name", "completionDate", "projectName"],
+  "includeCompleted": true,
+  "sortBy": "completionDate",
   "sortOrder": "desc"
 }
 ```
 
-## Project Queries
+如果用户要进行完成回顾，应优先使用 `get_completed_since`。上例只是 generic query，
+不提供 `CompletedTaskView` Contract，也不会自动排除 Project root completion。
 
-### Get all active projects
-```json
-{
-  "entity": "projects",
-  "filters": {
-    "status": ["Active"]
-  }
-}
-```
+### Dropped Tasks in the past 14 days
 
-### Get projects on hold
-```json
-{
-  "entity": "projects",
-  "filters": {
-    "status": ["OnHold"]
-  }
-}
-```
-
-### Include completed projects
-```json
-{
-  "entity": "projects",
-  "includeCompleted": true
-}
-```
-
-## Folder Queries
-
-### Get all folders
-```json
-{
-  "entity": "folders"
-}
-```
-
-### Get folder structure with project counts
-```json
-{
-  "entity": "folders",
-  "fields": ["name", "projectCount", "path"]
-}
-```
-
-## Complex Queries
-
-### Daily planning query - get today's agenda
 ```json
 {
   "entity": "tasks",
   "filters": {
-    "status": ["Next", "Available", "DueSoon", "Overdue"],
-    "dueWithin": 1
+    "status": ["Dropped"],
+    "droppedWithin": 14
   },
-  "sortBy": "dueDate",
-  "limit": 20
+  "fields": ["id", "name", "dropDate", "projectName"],
+  "includeCompleted": true,
+  "sortBy": "dropDate",
+  "sortOrder": "desc"
 }
 ```
 
-### Weekly review - get stale tasks
+## 6. Counts and bounded output
+
+### Count matching Tasks
+
 ```json
 {
   "entity": "tasks",
   "filters": {
-    "status": ["Available", "Blocked"],
-    "hasNote": false
-  },
-  "sortBy": "modificationDate",
-  "sortOrder": "asc",
-  "limit": 30
-}
-```
-
-### Get high-priority items (flagged or due soon)
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "flagged": true
-  },
-  "limit": 10
-}
-```
-Then separately:
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "dueWithin": 3
-  },
-  "limit": 10
-}
-```
-
-## Tips for Efficient Querying
-
-1. **Use `summary: true`** when you only need counts, not full details
-2. **Specify `fields`** to reduce response size when you don't need all data
-3. **Use `limit`** to prevent overwhelming responses from large result sets
-4. **Combine filters** to get exactly what you need in one query
-5. **Sort strategically** - sort by the field most relevant to your use case
-
-## Performance Comparison
-
-| Operation | dump_database | query_omnifocus |
-|-----------|--------------|-----------------|
-| Get all flagged tasks | ~300-500 lines (full dump) | ~20-50 lines (just flagged) |
-| Count overdue items | Full dump + client processing | Single line with `summary: true` |
-| Get tasks for one project | Full dump + client filtering | Just those tasks |
-| Check inbox | Full dump | Just inbox items |
-
-## Common Use Cases
-
-### Morning Planning
-Get your most important tasks for the day:
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "status": ["Next", "DueSoon", "Overdue"],
-    "flagged": true
-  },
-  "sortBy": "dueDate",
-  "limit": 15
-}
-```
-
-Or get tasks you planned to work on today:
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "plannedWithin": 0,
-    "status": ["Next", "Available"]
-  },
-  "sortBy": "plannedDate",
-  "fields": ["name", "plannedDate", "projectName", "estimatedMinutes"]
-}
-```
-
-### Project Status Check
-Quick count of tasks in a project:
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "projectName": "Q4 Goals"
+    "projectName": "Weekly Review",
+    "status": ["Next", "Available", "Blocked"]
   },
   "summary": true
 }
 ```
 
-### Inbox Processing
-See what's in your inbox:
+### Bounded candidate query
+
 ```json
 {
   "entity": "tasks",
-  "filters": {
-    "projectName": "inbox"
-  },
-  "fields": ["name", "note", "flagged", "dueDate", "tagNames"]
+  "filters": { "taskName": "structure" },
+  "fields": ["id", "name", "taskStatus", "projectName", "parentId"],
+  "limit": 20,
+  "sortBy": "name"
 }
 ```
 
-### Context-Based Views
-Get all tasks for a specific context/tag:
-```json
-{
-  "entity": "tasks",
-  "filters": {
-    "tags": ["home"],
-    "status": ["Available", "Next"]
-  },
-  "sortBy": "estimatedMinutes",
-  "sortOrder": "asc"
-}
-```
+可用于 `get_task` 返回 `not_found`/`ambiguous_match` 后的只读候选发现。不要自动选择候选。
+
+## 7. Sorting limitation
+
+推荐使用与 OmniFocus Raw property 同名的 sort fields，如：
+
+- `name`
+- `dueDate`
+- `deferDate`
+- `plannedDate`
+- `completionDate`
+- `dropDate`
+- `estimatedMinutes`
+- `taskStatus`
+
+当前 `sortBy` 直接访问 Raw item property。输出字段 `modificationDate` 和
+`creationDate` 分别映射自 Raw `modified` 和 `added`，但 sort 不会转换该 alias；因此
+示例不使用 `sortBy: "modificationDate"` 或 `sortBy: "creationDate"`。
+
+## 8. Tool selection examples
+
+| 用户需求 | 首选 |
+|---|---|
+| 当前全局状态 | `get_lean_snapshot` |
+| 单个 Project | `get_project` |
+| 单个 Action/Action Group/Project root | `get_task` |
+| 一段时间完成了什么 | `get_completed_since` |
+| 特定 Tag/Folder/status 通用筛选 | `query_omnifocus` |
+| 低频全量深度审计 | 手动/plugin/file 导出的 Full Snapshot + AI 分析 |
+
+不要为了回答日常问题而默认调用 `dump_database`。
