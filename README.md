@@ -1,242 +1,584 @@
-# OmniFocus MCP Server
+# OmniFocus-Agent-MCP v1.0-personalized
 
-[![npm version](https://img.shields.io/npm/v/omnifocus-mcp.svg)](https://www.npmjs.com/package/omnifocus-mcp)
-[![CI](https://github.com/themotionmachine/OmniFocus-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/themotionmachine/OmniFocus-MCP/actions/workflows/ci.yml)
+基于 upstream OmniFocus MCP `v1.9.2` 构建的个人管理语义层，用于向 GPT 和其他 MCP 客户端提供稳定、只读优先的 OmniFocus Domain View。
 
-A Model Context Protocol (MCP) server that connects OmniFocus to Claude and other MCP-compatible AI assistants.
+> Release status: `v1.0-personalized` — current frozen personalized architecture
 
-![OmniFocus MCP](assets/omnifocus-mcp-logo.png)
+## 1. Overview
 
-## Overview
+本项目最初提供 OmniFocus 数据访问、通用查询和对象操作能力。个人化版本在该基础上增加了明确的 Domain Semantic Layer，使 AI 不必直接解释 OmniFocus Raw Object、继承日期或 Project root 的底层表示。
 
-This server bridges AI assistants and your OmniFocus database. Through natural conversation, an assistant can query, create, edit, and remove tasks and projects — including bulk operations. Some things you can do with it:
+当前架构目标是：
 
-- Translate a syllabus PDF into a fully specified project with tasks, tags, defer dates, and due dates
-- Turn a meeting transcript into a list of actions
-- Audit and reorganize your tags, projects, and folders conversationally
-- Create visualizations of your tasks, projects, and tags
-- Process dozens of items in a single batch operation
+```text
+OmniFocus
+    ↓
+Domain Semantic Model
+    ↓
+MCP Tools
+    ↓
+AI Analysis
+```
 
-## Quick Start
+该版本的目标不是让 AI 自动管理任务，也不是让模型替用户做出执行决策，而是提供可验证、来源明确、结构稳定的事实视图，辅助用户分析个人执行系统。
 
-### Prerequisites
+核心原则：
 
-- macOS with [OmniFocus](https://www.omnigroup.com/omnifocus) installed
-- Node.js 20 or later (for `npx`)
+- 默认只读：个性化工作流以读取和分析为默认模式。
+- 事实先于解释：Domain 层表达 OmniFocus facts，不生成健康度、风险、优先级或行动建议。
+- AI 负责分析：AI 可以归纳、比较和识别模式，但不自动修改 OmniFocus。
+- 用户最终决策：任何确认、调整和执行都由用户本人控制。
 
-The first time the server talks to OmniFocus, macOS will ask you to allow automation access. Grant it once and you're set.
+### Version identity
 
-### Claude Desktop
+| 项目 | 当前值 |
+|---|---|
+| 个性化版本 | `v1.0-personalized` |
+| Upstream 基础版本 | `v1.9.2` |
+| MCP transport | stdio |
+| 运行平台 | macOS + OmniFocus |
+| 个性化核心接口 | `get_task`、`get_project`、`get_completed_since`、`get_lean_snapshot` |
 
-Add the server to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+`v1.0-personalized` 是个性化语义层的 release label；npm/package 基础版本仍保留 upstream `1.9.2`。
 
-```json
+---
+
+## 2. v1.0-personalized Release Notes
+
+`v1.0-personalized` 是当前已冻结的个人化架构基线。后续评审和演进应以本版本已经建立的 Domain Contract 和语义规则为起点。
+
+### Completed
+
+#### Task Domain
+
+- 严格的 Raw Task Adapter。
+- 稳定的 `TaskView`。
+- `action`、`action_group`、`project_root` 三种 `TaskKind`。
+- Due、Planned、Defer 的 direct/effective/source 表达。
+- Completion、Drop、Flag 的 direct/inherited/none 表达。
+
+#### Project Domain
+
+- 严格的 Raw Project Adapter。
+- 稳定的 `ProjectView`。
+- canonical Project ID。
+- standard 与 single-actions Project 分类。
+- Folder、状态、Task aggregate 和日期语义。
+
+#### Completion Domain
+
+- 稳定的 `CompletedTaskView`。
+- 基于 direct `completionDate` 的完成事件流。
+- 明确排除 Project root completion event。
+- 支持 Action 与 Action Group completion。
+
+#### Lean Snapshot Domain
+
+- 稳定的 `LeanSnapshotView`。
+- Active Projects、Planned Projects、Project Deadlines、Attention 和 Inbox sections。
+- Project 与 root Task 的 canonical join。
+- 完整计数、确定性排序和独立截断。
+
+#### Planned Attention Semantics
+
+- Direct Planned owner 产生 Planned visibility。
+- inherited Planned facts 被保留，但不会生成重复 Attention。
+- Project-level Planned owner 进入独立的 `projects.planned` section。
+
+#### Due Attention Semantics
+
+- Direct Due owner 产生 deadline signal。
+- inherited Due facts 被保留，但不会生成重复 `dueSoon` 或 `overdue` Attention。
+- Project-level Due owner 进入独立的 `projects.deadline` section。
+
+#### MCP read tools
+
+- `get_task`
+- `get_project`
+- `get_completed_since`
+- `get_lean_snapshot`
+
+这四个 Tool 返回稳定 Domain JSON，而不是把通用查询结果直接暴露给 AI。
+
+### Frozen Design Principles
+
+#### Domain-first architecture
+
+个性化功能首先定义 Domain Contract，再定义 Tool 输出。MCP handler 不承担核心业务语义。
+
+```text
+Raw Query
+    -> Strict Adapter
+    -> Domain Semantics
+    -> Mapper / Composer
+    -> MCP Response
+```
+
+#### Semantic projection
+
+Domain View 是对 OmniFocus facts 的明确投影，而不是 Raw Object dump。字段被固定选择、验证和解释，内部 Raw contract 不直接公开。
+
+#### Direct ownership of management signals
+
+Planned 和 Due 信号按 direct owner 粒度表达。容器继承产生的 effective value 是事实，但不是新的管理信号 owner。
+
+#### Separation of fact and interpretation
+
+Domain 层负责表达：
+
+- 对象是什么。
+- 值来自对象自身还是容器继承。
+- 当前 OmniFocus native status 是什么。
+- 对象之间的结构关系是什么。
+
+Domain 层不负责表达：
+
+- 应该先做什么。
+- Project 是否健康。
+- 哪个对象风险最高。
+- 用户应该采取什么行动。
+
+这些解释属于 AI Analysis 和用户决策层。
+
+---
+
+## 3. Architecture Overview
+
+```mermaid
+flowchart TD
+    RAW["OmniFocus Raw Data<br/>Tasks / Projects / Folders"]
+    BRIDGE["Primitive and Bridge Layer<br/>queryOmnifocus + JXA + osascript"]
+    ADAPTERS["Strict Adapters<br/>Raw contract validation"]
+
+    TASK["Task Domain<br/>TaskView"]
+    PROJECT["Project Domain<br/>ProjectView"]
+    COMPLETION["Completion Domain<br/>CompletedTaskView"]
+    SNAPSHOT["Snapshot Domain<br/>LeanSnapshotView"]
+
+    TOOLS["Personalized MCP Read Tools<br/>get_task / get_project<br/>get_completed_since / get_lean_snapshot"]
+    AI["AI Analysis<br/>comparison, review, pattern recognition"]
+    USER["User Decision<br/>final confirmation and execution"]
+
+    RAW -->|读取原始事实| BRIDGE
+    BRIDGE -->|固定字段映射| ADAPTERS
+
+    ADAPTERS --> TASK
+    ADAPTERS --> PROJECT
+    ADAPTERS --> COMPLETION
+    ADAPTERS --> SNAPSHOT
+
+    TASK --> TOOLS
+    PROJECT --> TOOLS
+    COMPLETION --> TOOLS
+    SNAPSHOT --> TOOLS
+
+    TOOLS -->|稳定 Domain JSON| AI
+    AI -->|分析结果，不自动写入| USER
+```
+
+主要实现路径：
+
+```text
+src/tools/primitives/queryOmnifocus.ts
+    ↓
+src/domain/{task,project,completion,snapshot}/
+    ↓
+src/tools/primitives/get*.ts
+    ↓
+src/tools/definitions/get*.ts
+    ↓
+src/server.ts
+```
+
+### Layer responsibilities
+
+| Layer | 职责 |
+|---|---|
+| OmniFocus Raw Data | 提供 Task、Project、Folder、日期、状态和层级的原始事实 |
+| Primitive / Bridge | 生成并执行只读 OmniJS 查询，映射固定字段和 canonical ID |
+| Adapter | 严格校验 Raw item；不静默修复 malformed values |
+| Domain | 分类、保留来源语义并构建稳定 View |
+| Snapshot Composer | 跨 Task/Project 组合当前系统状态 |
+| MCP Tool | 参数校验、稳定响应和错误分类 |
+| AI Analysis | 基于事实进行解释，不承担事实生成和自动写入 |
+
+---
+
+## 4. Domain Model
+
+### Task Domain
+
+Task Domain 位于 `src/domain/task/`，对外读模型是 `TaskView`。
+
+`TaskView` 包含：
+
+- identity：`id`、`name`、`note`
+- `TaskKind`
+- native Task status
+- completion、drop、flag semantics
+- Due、Planned、Defer semantics
+- Project context 与 Inbox location
+- hierarchy、tags、repeat、estimate 和 timestamps
+
+#### TaskKind
+
+```ts
+type TaskKind = "action" | "action_group" | "project_root";
+```
+
+分类规则：
+
+```text
+isProjectRoot = true  -> project_root
+否则 hasChildren      -> action_group
+否则                  -> action
+```
+
+- `action`：没有 children 的普通执行项。
+- `action_group`：有 children、但不是 Project root 的 Task。
+- `project_root`：OmniFocus Project 的 root Task 表示。
+
+Action 当前属于 Task Domain，不是独立 Domain。当前代码没有独立 `ActionView`、Action aggregate 或 `get_action` Tool。
+
+### Project Domain
+
+Project Domain 位于 `src/domain/project/`，对外读模型是 `ProjectView`。
+
+`ProjectView` 包含：
+
+- canonical Project identity
+- Project kind：`standard | single_actions`
+- Active、OnHold、Done、Dropped 状态语义
+- Folder context
+- direct/effective Due 和 Defer
+- direct Task IDs、全部 descendant Task IDs 和 native-status counts
+- timestamps
+
+#### Project Root semantics
+
+OmniJS Project ID 与 Project root Task ID 属于不同 namespace。个性化 Domain 对外统一使用：
+
+```text
+canonical Project ID = project.task.id.primaryKey
+```
+
+因此同一个 canonical ID 可以从两个互补视角读取：
+
+```text
+get_project(projectId)
+    -> Project aggregate、Folder、Project status、Task summary
+
+get_task(projectId)
+    -> 对应 project_root Task 的 Task facts
+```
+
+Snapshot 使用 canonical ID 将 `RawLeanProject` 与 `isProjectRoot = true` 的 `RawLeanTask` 精确连接。Project 是管理聚合；root Task 是它在 OmniFocus Task 模型中的表示。两者不是重复接口。
+
+### Completion Domain
+
+Completion Domain 位于 `src/domain/completion/`，对外读模型是 `CompletedTaskView`。
+
+`CompletedTaskView` 表达一次直接完成事件：
+
+- Action 或 Action Group identity
+- direct `completedDate`
+- Project/Inbox context
+- tags
+- created/modified timestamps
+
+`get_completed_since` 读取 direct `completionDate` 位于指定闭区间内的完成事件，并按完成时间降序返回。
+
+它不会通过以下值推导历史完成：
+
+- `taskStatus`
+- `modificationDate`
+- `effectiveCompletedDate`
+
+Project root completion event 被排除，Action Group completion 被保留。Completion Domain 是未来 Review Workflow、完成回顾和趋势分析的事实基础，但当前不自动生成 Review 结论。
+
+### Snapshot Domain
+
+Snapshot Domain 位于 `src/domain/snapshot/`，对外读模型是 `LeanSnapshotView`。
+
+```text
+LeanSnapshotView
+├── generatedAt
+├── scope = all
+├── projects
+│   ├── active
+│   ├── planned
+│   └── deadline
+├── attention
+└── inbox
+```
+
+每个 list section 均提供：
+
+```text
+total
+returned
+truncated
+items
+```
+
+Lean Snapshot 不是完整数据库导出。它只读取当前 remaining Tasks 和 Active Projects，并输出当前管理视角需要的 compact facts：
+
+- 不读取 note 全文，只输出 `hasNote`。
+- 不包含完成历史；完成历史由 Completion Domain 提供。
+- 不包含 Waiting、health、risk、priority 或 recommendation。
+- 不展开所有 Project Task details，只保留 Task counts 和 native-status aggregate。
+- Project root 在内部用于语义解析，但不进入 Task Attention 或 Inbox。
+
+它也不是普通查询接口。Snapshot Composer 会执行 Project/root join、ownership classification、完整计数、稳定排序和独立截断，从而形成一次性的系统级 current-state read model。
+
+---
+
+## 5. Semantic Rules
+
+### Direct, effective, and source
+
+Domain 日期语义统一表达为：
+
+```ts
 {
-  "mcpServers": {
-    "omnifocus": {
-      "command": "npx",
-      "args": ["-y", "omnifocus-mcp"]
-    }
-  }
+  direct: string | null;
+  effective: string | null;
+  source: "direct" | "inherited" | "none";
 }
 ```
 
-Then restart Claude Desktop.
+- `direct`：值直接设置在当前对象上。
+- `effective`：OmniFocus 计算后的实际生效值，可能来自当前对象或上层容器。
+- `source = direct`：当前对象直接拥有该值。
+- `source = inherited`：当前对象只有从容器继承的 effective value。
+- `source = none`：不存在对应事实。
 
-### Claude Code
+该区分用于保留事实，同时防止把 inherited value 当作新的管理信号。
 
-```bash
-claude mcp add omnifocus -- npx -y omnifocus-mcp
+### Planned Attention
+
+冻结规则：
+
+> Direct Planned owner produces Planned visibility.
+
+对于 Action 和 Action Group，`planned` Attention 需要：
+
+```text
+planned.source = direct
+AND planned.direct <= generatedAt
+AND taskStatus != Blocked
 ```
 
-Other MCP clients work the same way: launch `npx -y omnifocus-mcp` over stdio.
+对于 Active Project，root Task 的 direct Planned 已到达时，Project 进入 `projects.planned`。
 
-## Example Conversations
+Inherited Planned values：
 
-**Targeted queries:**
+- 继续保留在 Domain dates 中。
+- 不产生独立 `planned` Attention。
+- 不把一个 Project-level workflow 展开为多个重复 child signals。
 
-> "Show me all my flagged tasks due this week"
->
-> "What are my next actions in the Work folder?"
->
-> "Count how many tasks are in each project"
+### Due Attention
 
-**Reorganizing:**
+冻结规则：
 
-> "I want every task to have an energy level tag. Show me a list of all the tasks that don't have one and your suggestions for what tag to add. I'll make any changes I think are appropriate. Then make the changes in OmniFocus."
+> Direct Due owner produces deadline signal.
 
-**Capturing from anywhere:**
+对于 Action 和 Action Group：
 
-> "Ok, thanks for the detailed explanation of why the rule of law is important. Add a recurring task to my activism project that reminds me to call my representative weekly. Include a summary of this conversation in the notes field."
-
-**Working with perspectives:**
-
-> "What perspectives do I have available?"
->
-> "Show me what's in my Inbox perspective"
-
-**Processing transcripts or PDFs:**
-
-> "I'm pasting in the transcript from today's meeting. Please analyze it and create tasks in OmniFocus for any action items assigned to me. Put them in my 'Product Development' project."
-
-## Tools
-
-The server provides 12 tools. Optional parameters are marked.
-
-### `query_omnifocus`
-
-Query tasks, projects, or folders with targeted filters — much faster and lighter than dumping the whole database. See [QUERY_TOOL_REFERENCE.md](QUERY_TOOL_REFERENCE.md) for the full reference and [QUERY_TOOL_EXAMPLES.md](QUERY_TOOL_EXAMPLES.md) for worked examples.
-
-| Parameter | Description |
-|---|---|
-| `entity` | What to query: `tasks`, `projects`, or `folders` |
-| `filters` *(optional)* | Combine with AND logic; array filters (`tags`, `status`) use OR within the array |
-| `fields` *(optional)* | Only return the listed fields — keeps responses small |
-| `limit`, `sortBy`, `sortOrder` *(optional)* | Shape the result list |
-| `includeCompleted` *(optional)* | Include completed/dropped items (default: false) |
-| `summary` *(optional)* | Return only the match count |
-
-Available filters:
-
-- **Containers**: `projectName` (case-insensitive partial match; `"inbox"` targets the inbox), `projectId`, `folderId` (includes subfolders)
-- **Names**: `taskName` (case-insensitive partial match)
-- **Tags**: `tags` (exact match, case-sensitive)
-- **Status**: `status` — tasks: `Next`, `Available`, `Blocked`, `DueSoon`, `Overdue`, `Completed`, `Dropped`; projects: `Active`, `OnHold`, `Done`, `Dropped`
-- **Dates, forward-looking**: `dueWithin`, `deferredUntil`, `plannedWithin` (ranges), `dueOn`, `deferOn`, `plannedOn` (exact day). Accept a number of days, `"today"`, `"tomorrow"`, `"this week"`, `"next week"`, or an ISO date
-- **Dates, backward-looking**: `addedWithin`, `addedOn`, `completedWithin`, `completedOn`, `droppedWithin`, `droppedOn` (completed/dropped filters require `includeCompleted: true`)
-- **Flags & misc**: `flagged`, `inbox`, `hasNote`, `isRepeating`, `reviewDue` (projects only)
-
-### `dump_database`
-
-Get the complete state of your database. Use for comprehensive analysis; prefer `query_omnifocus` for anything targeted.
-
-- `hideCompleted` *(optional)*: hide completed/dropped tasks (default: true)
-- `hideRecurringDuplicates` *(optional)*: hide duplicate instances of recurring tasks (default: true)
-
-### `add_omnifocus_task`
-
-Create a new task.
-
-- `name`
-- `projectName` *(optional)*: project to add the task to (defaults to inbox)
-- `parentTaskId` / `parentTaskName` *(optional)*: nest under an existing task
-- `note`, `dueDate`, `deferDate`, `plannedDate`, `flagged`, `estimatedMinutes`, `tags` *(all optional)*
-
-### `add_project`
-
-Create a new project.
-
-- `name`
-- `folderName` *(optional)*: folder to place the project in
-- `sequential` *(optional)*: whether tasks must be completed in order
-- `note`, `dueDate`, `deferDate`, `flagged`, `estimatedMinutes`, `tags` *(all optional)*
-
-### `edit_item`
-
-Edit an existing task or project. Also the way to **move** items — set `newProjectName` to move a task into a project, or to `""`/`"inbox"` to send it to the inbox.
-
-- `id` or `name`: which item to edit (id takes precedence)
-- `itemType`: `task` or `project`
-- Common: `newName`, `newNote`, `newDueDate`, `newDeferDate`, `newFlagged`, `newEstimatedMinutes` (dates in ISO format; empty string clears)
-- Tasks: `newStatus` (`incomplete`, `completed`, `dropped`, `skipped` — skipped only for repeating tasks), `addTags`, `removeTags`, `replaceTags`, `newProjectName`, `newPlannedDate`
-- Projects: `newProjectStatus` (`active`, `completed`, `dropped`, `onHold`), `newFolderName`, `newSequential`, `markReviewed` (sets the next review date based on the project's review interval)
-
-### `remove_item`
-
-Remove a task or project.
-
-- `id` or `name`: which item to remove
-- `itemType`: `task` or `project`
-
-### `batch_add_items`
-
-Create multiple tasks and projects in one operation. Each item accepts the same fields as `add_omnifocus_task` / `add_project`, plus `type` (`task` or `project`) and optional hierarchy helpers:
-
-- `tempId`: a temporary ID other items in the same batch can reference
-- `parentTempId`: nest this item under another batch item's `tempId`
-
-```json
-{
-  "items": [
-    { "type": "project", "name": "My Project", "tempId": "proj1" },
-    { "type": "task", "name": "First task", "parentTempId": "proj1" },
-    { "type": "task", "name": "Parent task", "parentTempId": "proj1", "tempId": "t1" },
-    { "type": "task", "name": "Subtask", "parentTempId": "t1" }
-  ]
-}
+```text
+due.source = direct
+AND native taskStatus = DueSoon | Overdue
 ```
 
-### `batch_remove_items`
+对于 Active Project，root Task 直接拥有 Due 且 native status 为 `DueSoon` 或 `Overdue` 时，Project 进入 `projects.deadline`。
 
-Remove multiple tasks or projects in one operation. Each item takes `id` or `name`, plus `itemType`.
+Inherited Due values：
 
-### `list_perspectives`
+- 继续保留在 Domain dates 中。
+- 不产生独立 `dueSoon` 或 `overdue` Attention。
+- 不因为多个 descendants 继承相同 Due 而产生重复 deadline signals。
 
-List available perspectives, both built-in and custom (custom perspectives are an OmniFocus Pro feature).
+系统使用 OmniFocus native `taskStatus` 判断 DueSoon/Overdue，不定义自有 DueSoon 时间窗口。
 
-- `includeBuiltIn`, `includeCustom` *(optional, default: true)*
+### Attention aggregation
 
-### `get_perspective_view`
+Attention reasons 的固定顺序为：
 
-Get the items visible in a named perspective.
-
-- `perspectiveName`: e.g. `Inbox`, `Flagged`, or a custom perspective name
-- `limit` *(optional, default: 100)*, `includeMetadata` *(optional)*, `fields` *(optional)*
-
-### `list_tags`
-
-List all tags with their hierarchy, active status, and task counts.
-
-- `includeDropped` *(optional, default: false)*
-
-### `create_tag`
-
-Create a tag, optionally nested under an existing parent.
-
-- `name`
-- `parentTagName` / `parentTagID` *(optional; ID takes precedence)*
-
-## Resources
-
-Resources let MCP clients attach OmniFocus data to a conversation as context, without tool calls. In Claude Code, type `@` to browse them; Claude Desktop and other resource-aware clients can attach them directly. All resources return JSON.
-
-| URI | Description |
-|---|---|
-| `omnifocus://inbox` | Current inbox items |
-| `omnifocus://today` | Today's agenda — due today, planned for today, and overdue |
-| `omnifocus://flagged` | All flagged items |
-| `omnifocus://stats` | Database statistics (task counts, overdue, flagged, etc.) |
-| `omnifocus://project/{name}` | Tasks in a specific project |
-| `omnifocus://perspective/{name}` | Items visible in a named perspective |
-
-The two template resources support listing all available values and autocompleting the `{name}` parameter.
-
-## Server Instructions & Logging
-
-**Instructions:** during the MCP handshake the server sends usage guidance to the client — tool-selection advice (prefer `query_omnifocus` over `dump_database`), filter tips, and the resource catalog. No configuration needed.
-
-**Logging:** the server emits structured logs via the MCP logging protocol. Clients can adjust verbosity with `logging/setLevel` (`debug`, `info`, `warning`, `error`, ...). Script execution timing and errors are logged automatically.
-
-## How It Works
-
-The server communicates with OmniFocus through `osascript`, using JXA (JavaScript for Automation) and OmniFocus's embedded Omni Automation (OmniJS) where appropriate. It's built on the official [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) and talks to clients over stdio.
-
-## Roadmap
-
-- MCP `prompt` support
-- Manipulating notifications for projects and tasks
-- See the [GitHub issues](https://github.com/themotionmachine/OmniFocus-MCP/issues) for feature requests and known issues
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request. CI runs type checking, unit tests, and a build on every PR.
-
-```bash
-npm install
-npm test            # unit tests
-npm run build       # compile to dist/
-npm run test:integration  # requires OmniFocus; creates and removes TEST:-prefixed items
+```text
+overdue -> dueSoon -> planned -> flagged
 ```
+
+同一 Task 最多出现一次，但可以同时携带多个 reasons。Inbox 和 Attention 是独立 section，因此同一 Task 可以出现在两者中。
+
+---
+
+## 6. Current MCP Tools
+
+本节描述 `v1.0-personalized` 冻结的 Domain read tools。它们不是简单数据查询，而是面向 AI 分析的领域投影。
+
+### `get_task`
+
+按 exact Task ID 或区分大小写的 exact name 读取单个 `TaskView`。
+
+主要用途：
+
+- 区分 action、action_group 和 project_root。
+- 检查 direct/effective 日期来源。
+- 检查 completion、drop 和 flag provenance。
+- 获取 Project context、Inbox location 和 hierarchy。
+
+它查询 OmniFocus Task 实体，但返回的是稳定 Task Domain View，而不是通用 Task query result。
+
+### `get_project`
+
+按 canonical Project ID 或区分大小写的 exact name 读取单个 `ProjectView`。
+
+主要用途：
+
+- 获取 Project status、kind 和 Folder context。
+- 查看 direct/all Task relationships 和 native-status counts。
+- 查看 Project Due/Defer provenance。
+- 使用统一 canonical ID 连接 Project 和 root Task 视角。
+
+它表达 Project aggregate，不替代选择性 `get_task` 读取。
+
+### `get_completed_since`
+
+读取 `{ since, until? }` 闭区间内的 direct completion events。
+
+主要用途：
+
+- 完成回顾。
+- Review Workflow 的事实输入。
+- 后续趋势或节奏分析。
+
+`since` 和 `until` 必须是带 `Z` 或明确 UTC offset 的完整 ISO 8601 datetime；`until` 缺省为调用时刻。空结果是正常成功。
+
+### `get_lean_snapshot`
+
+读取当前全系统的 compact `LeanSnapshotView`。
+
+主要用途：
+
+- 查看全部 Active Projects 的摘要。
+- 查看已经到达的 direct Planned Project owners。
+- 查看 Project-level direct deadline owners。
+- 查看 Task-level Attention reasons。
+- 查看 Inbox 当前状态。
+
+可选 `limitPerSection` 独立限制各 section，默认 `25`，允许 `1..100`。每个 section 在截断前计算完整 `total`。
+
+### Upstream compatibility surface
+
+仓库仍保留 upstream `v1.9.2` 的通用查询、Resource、Perspective、Tag 和 mutation tools，`src/server.ts` 也仍注册这些能力。它们不是 `v1.0-personalized` Domain Contract 的组成部分。
+
+因此，“默认只读”是当前个人化使用模型和客户端暴露策略，不应被误解为 Server 已从代码层移除全部写入能力。用于个人化分析的 MCP client 应只暴露所需的 read tools。
+
+---
+
+## 7. Current Design Boundaries
+
+`v1.0-personalized` 当前不包含以下能力。
+
+### Full Snapshot MCP
+
+当前只有 Lean Snapshot。仓库中的 `dump_database` 是 upstream raw/full report 能力，不是一个经过稳定 Domain 建模的 Full Snapshot MCP。
+
+### Action independent Domain
+
+Action 与 Action Group 当前属于 Task Domain，通过 `TaskKind` 表达。不存在独立 Action Domain、`ActionView` 或 `get_action`。
+
+### AI automatic decision making
+
+Domain Tool 不判断优先级、风险、健康度或“下一步应该做什么”。AI 分析结果不等于系统决策。
+
+### OmniFocus write automation
+
+自动写入不是个性化架构的一部分。当前个性化 workflow 不会根据 Snapshot 或 AI 分析自动创建、编辑、完成或删除 OmniFocus 对象。
+
+Upstream mutation tools 仍存在于仓库中，但不属于个性化默认操作路径。
+
+这些边界是当前冻结范围，不代表对应方向已经确定实现。
+
+---
+
+## 8. Future Roadmap
+
+### Future Phase
+
+未来评审可能考虑：
+
+- Full Snapshot：在明确 Contract 和体积边界后，提供比 Lean Snapshot 更完整的 Domain read model。
+- AI Review Workflow：组合 Snapshot 和 Completion facts，支持结构化回顾流程。
+- Better semantic analysis：在不污染事实层的前提下，增强对执行系统模式的分析。
+
+未来演进应继续保持：
+
+- Raw facts 与解释分离。
+- direct ownership 语义稳定。
+- 写入行为不由分析结果自动触发。
+- 新概念先定义 Domain boundary，再决定是否增加 MCP Tool。
+
+---
+
+## 9. Safety Model
+
+### Default read-only
+
+个人化运行模式默认只暴露和调用读取能力，核心接口为：
+
+```text
+get_task
+get_project
+get_completed_since
+get_lean_snapshot
+```
+
+### No automatic OmniFocus mutation
+
+Snapshot、Attention 和 Completion 结果只作为分析输入，不会自动触发 OmniFocus 写入。AI 不应根据分析结果自行调用创建、编辑、完成、移动或删除操作。
+
+### User retains final control
+
+系统责任边界是：
+
+```text
+OmniFocus 提供事实
+    ↓
+Domain Layer 解释事实来源和结构
+    ↓
+AI 分析事实
+    ↓
+用户确认、决策并执行
+```
+
+用户始终保持最终控制权。
+
+### Deployment note
+
+当前 Server 仍包含 upstream mutation tools，因此安全模型需要客户端 Tool allowlist、明确的 Agent instructions 或等价部署限制配合。README 中的“默认只读”描述的是 `v1.0-personalized` 的使用契约，不是对整个 upstream-compatible Server surface 的技术性写入隔离声明。
+
+---
+
+## Maintenance Reference
+
+当前 Domain 设计与冻结语义主要位于：
+
+```text
+src/domain/task/
+src/domain/project/
+src/domain/completion/
+src/domain/snapshot/
+
+engineer_log/GET_TASK_ENGINEERING_LOG.md
+engineer_log/GET_PROJECT_ENGINEERING_LOG.md
+engineer_log/GET_COMPLETED_SINCE_ENGINEERING_LOG.md
+engineer_log/GET_LEAN_SNAPSHOT_ENGINEERING_LOG.md
+engineer_log/GET_LEAN_SNAPSHOT_PLANNED_CORRECTION_ENGINEERING_LOG.md
+engineer_log/GET_LEAN_SNAPSHOT_DUE_ATTENTION_GRANULARITY_ENGINEERING_LOG.md
+```
+
+后续维护者和 AI Agent 应优先以类型定义、Domain tests 和工程日志中的冻结规则判断当前行为，不应从通用 Tool 文案推断 Domain semantics。
 
 ## License
 
