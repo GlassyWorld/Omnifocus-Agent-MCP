@@ -1,9 +1,13 @@
 import { classifyProjectKind } from '../project/projectClassifier.js';
 import { classifyProjectDate } from '../project/projectDateSemantics.js';
 import { classifyProjectStatus } from '../project/projectStatusSemantics.js';
+import type { DateSemantics } from '../task/taskTypes.js';
 import type { LeanProjectSummary, RawLeanProject } from './snapshotTypes.js';
 
-export function mapRawLeanProject(raw: RawLeanProject): LeanProjectSummary {
+export function mapRawLeanProject(
+  raw: RawLeanProject,
+  planned: DateSemantics,
+): LeanProjectSummary {
   const status = classifyProjectStatus(raw.status);
   if (!status.active || status.raw !== 'Active') {
     throw new Error('Lean Project must have Active status');
@@ -22,6 +26,7 @@ export function mapRawLeanProject(raw: RawLeanProject): LeanProjectSummary {
     flagged: raw.flagged,
     dates: {
       due: classifyProjectDate(raw.dueDate, raw.effectiveDueDate),
+      planned,
       defer: classifyProjectDate(raw.deferDate, raw.effectiveDeferDate),
     },
     tasks: {

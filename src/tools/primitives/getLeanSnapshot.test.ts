@@ -57,12 +57,22 @@ const validProject = {
   effectiveDeferDate: null,
 };
 
+const validRootTask = {
+  ...validTask,
+  id: validProject.id,
+  name: validProject.name,
+  taskStatus: 'Blocked',
+  inInbox: false,
+  isProjectRoot: true,
+  hasChildren: true,
+};
+
 const params = {
   generatedAt: '2026-07-10T12:00:00.000Z',
   limitPerSection: 25,
 };
 
-function mockSuccessfulQueries(tasks = [validTask], projects = [validProject]) {
+function mockSuccessfulQueries(tasks = [validTask, validRootTask], projects = [validProject]) {
   mockedQueryOmnifocus.mockImplementation(async query => (
     query.entity === 'tasks'
       ? { success: true, items: tasks, count: tasks.length }
@@ -105,6 +115,7 @@ describe('getLeanSnapshot primitive', () => {
     if (result.success) {
       expect(result.snapshot.scope).toBe('all');
       expect(result.snapshot.projects.active.total).toBe(1);
+      expect(result.snapshot.projects.planned.total).toBe(0);
       expect(result.snapshot.inbox.total).toBe(1);
       expect(JSON.stringify(result.snapshot)).not.toMatch(/"raw"|"note"/);
     }
@@ -145,9 +156,16 @@ describe('getLeanSnapshot primitive', () => {
   });
 
   it('returns composer invariant failures', async () => {
-    mockSuccessfulQueries([], [{ ...validProject, status: 'OnHold' }]);
+    mockSuccessfulQueries([validRootTask], [{ ...validProject, status: 'OnHold' }]);
     const result = await getLeanSnapshot(params);
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error).toContain('Active');
+  });
+
+  it('returns missing Project root contract failures', async () => {
+    mockSuccessfulQueries([validTask], [validProject]);
+    const result = await getLeanSnapshot(params);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toContain('Missing Project root Task');
   });
 });

@@ -7,7 +7,7 @@ const DEFAULT_LIMIT_PER_SECTION = 25;
 
 export const schema = z.object({
   limitPerSection: z.number().optional().describe(
-    'Maximum items returned independently for active projects, attention, and Inbox. Integer from 1 through 100. Defaults to 25.',
+    'Maximum items returned independently for active projects, planned projects, attention, and Inbox. Integer from 1 through 100. Defaults to 25.',
   ),
 });
 

@@ -1,3 +1,4 @@
+import { classifyDate } from '../task/dateSemantics.js';
 import type { AttentionReason, RawLeanTask } from './snapshotTypes.js';
 
 export function classifyAttentionReasons(
@@ -9,10 +10,12 @@ export function classifyAttentionReasons(
   if (raw.taskStatus === 'Overdue') reasons.push('overdue');
   if (raw.taskStatus === 'DueSoon') reasons.push('dueSoon');
 
+  const planned = classifyDate(raw.plannedDate, raw.effectivePlannedDate);
   if (
     raw.taskStatus !== 'Blocked'
-    && raw.effectivePlannedDate !== null
-    && Date.parse(raw.effectivePlannedDate) <= Date.parse(generatedAt)
+    && planned.source === 'direct'
+    && planned.direct !== null
+    && Date.parse(planned.direct) <= Date.parse(generatedAt)
   ) {
     reasons.push('planned');
   }

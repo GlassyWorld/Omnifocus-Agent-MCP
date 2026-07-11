@@ -90,6 +90,7 @@ export type LeanProjectSummary = {
   flagged: boolean;
   dates: {
     due: ProjectDateSemantics;
+    planned: DateSemantics;
     defer: ProjectDateSemantics;
   };
   tasks: {
@@ -117,6 +118,7 @@ export type LeanSnapshotView = {
   scope: "all";
   projects: {
     active: SnapshotList<LeanProjectSummary>;
+    planned: SnapshotList<LeanProjectSummary>;
   };
   attention: {
     total: number;

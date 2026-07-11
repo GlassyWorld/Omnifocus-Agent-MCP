@@ -2,9 +2,12 @@ import { z } from 'zod';
 import { classifyAttentionReasons } from './attentionClassifier.js';
 import { mapRawLeanProject } from './leanProjectMapper.js';
 import { mapRawLeanTask } from './leanTaskMapper.js';
+import { isProjectPlannedReady } from './projectPlannedClassifier.js';
+import { resolveProjectPlannedDates } from './snapshotProjectPlannedResolver.js';
 import {
   compareAttention,
   compareInboxTasks,
+  comparePlannedProjects,
   compareProjects,
   type AttentionCandidate,
   type LeanTaskCandidate,
@@ -40,8 +43,24 @@ export function composeLeanSnapshot(input: LeanSnapshotComposerInput): LeanSnaps
   assertUniqueIds(input.tasks, 'Task');
   assertUniqueIds(input.projects, 'Project');
 
-  const projectItems = input.projects.map(mapRawLeanProject).sort(compareProjects);
-  const activeProjects = buildSnapshotList(projectItems, input.limitPerSection);
+  const projectPlannedDates = resolveProjectPlannedDates(input.tasks, input.projects);
+  const projectItems = input.projects.map(project => {
+    const planned = projectPlannedDates.get(project.id);
+    if (!planned) {
+      throw new Error(`Missing resolved Planned semantics for Project ${project.id}`);
+    }
+    return mapRawLeanProject(project, planned);
+  });
+  const activeProjects = buildSnapshotList(
+    [...projectItems].sort(compareProjects),
+    input.limitPerSection,
+  );
+  const plannedProjects = buildSnapshotList(
+    projectItems
+      .filter(project => isProjectPlannedReady(project, input.generatedAt))
+      .sort(comparePlannedProjects),
+    input.limitPerSection,
+  );
 
   const taskCandidates: LeanTaskCandidate[] = input.tasks
     .filter(task => !task.isProjectRoot)
@@ -79,7 +98,10 @@ export function composeLeanSnapshot(input: LeanSnapshotComposerInput): LeanSnaps
   return {
     generatedAt: input.generatedAt,
     scope: 'all',
-    projects: { active: activeProjects },
+    projects: {
+      active: activeProjects,
+      planned: plannedProjects,
+    },
     attention: {
       total: attentionCandidates.length,
       returned: attentionItems.length,

@@ -11,6 +11,7 @@ const emptySnapshot = {
   scope: 'all' as const,
   projects: {
     active: { total: 0, returned: 0, truncated: false, items: [] },
+    planned: { total: 0, returned: 0, truncated: false, items: [] },
   },
   attention: {
     total: 0,

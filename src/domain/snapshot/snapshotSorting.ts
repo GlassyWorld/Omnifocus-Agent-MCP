@@ -40,6 +40,15 @@ export function compareProjects(left: LeanProjectSummary, right: LeanProjectSumm
     || compareCodeUnits(left.id, right.id);
 }
 
+export function comparePlannedProjects(
+  left: LeanProjectSummary,
+  right: LeanProjectSummary,
+): number {
+  return compareNullableDates(left.dates.planned.direct, right.dates.planned.direct)
+    || compareCodeUnits(left.name, right.name)
+    || compareCodeUnits(left.id, right.id);
+}
+
 export function compareInboxTasks(left: LeanTaskCandidate, right: LeanTaskCandidate): number {
   return compareNullableDates(left.raw.creationDate, right.raw.creationDate)
     || compareCodeUnits(left.summary.name, right.summary.name)
@@ -62,12 +71,9 @@ export function compareAttention(left: AttentionCandidate, right: AttentionCandi
       right.summary.dates.due.effective,
     );
   } else if (leftReason === 'planned') {
-    detailComparison = compareNumbers(
-      SOURCE_RANK[left.summary.dates.planned.source],
-      SOURCE_RANK[right.summary.dates.planned.source],
-    ) || compareNullableDates(
-      left.summary.dates.planned.effective,
-      right.summary.dates.planned.effective,
+    detailComparison = compareNullableDates(
+      left.summary.dates.planned.direct,
+      right.summary.dates.planned.direct,
     );
   } else {
     detailComparison = compareNullableDates(

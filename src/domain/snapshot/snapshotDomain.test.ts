@@ -3,15 +3,19 @@ import { classifyAttentionReasons } from './attentionClassifier.js';
 import { composeLeanSnapshot } from './leanSnapshotComposer.js';
 import { mapRawLeanProject } from './leanProjectMapper.js';
 import { mapRawLeanTask } from './leanTaskMapper.js';
+import { isProjectPlannedReady } from './projectPlannedClassifier.js';
+import { resolveProjectPlannedDates } from './snapshotProjectPlannedResolver.js';
 import { adaptSnapshotProjectItem } from './snapshotProjectAdapter.js';
 import { adaptSnapshotTaskItem } from './snapshotTaskAdapter.js';
 import { compareCodeUnits } from './snapshotSorting.js';
+import type { DateSemantics } from '../task/taskTypes.js';
 import type { RawLeanProject, RawLeanTask } from './snapshotTypes.js';
 
 const GENERATED_AT = '2026-07-10T12:00:00.000Z';
 const EARLIER = '2026-07-09T12:00:00.000Z';
 const LATER = '2026-07-11T12:00:00.000Z';
 const FAR_LATER = '2026-07-12T12:00:00.000Z';
+const NO_DATE: DateSemantics = { direct: null, effective: null, source: 'none' };
 
 function rawTask(overrides: Partial<RawLeanTask> = {}): RawLeanTask {
   return {
@@ -65,6 +69,20 @@ function rawProject(overrides: Partial<RawLeanProject> = {}): RawLeanProject {
     effectiveDeferDate: null,
     ...overrides,
   };
+}
+
+function projectRoot(
+  project: RawLeanProject,
+  overrides: Partial<RawLeanTask> = {},
+): RawLeanTask {
+  return rawTask({
+    id: project.id,
+    name: project.name,
+    taskStatus: 'Blocked',
+    isProjectRoot: true,
+    hasChildren: true,
+    ...overrides,
+  });
 }
 
 describe('snapshotTaskAdapter', () => {
@@ -204,8 +222,11 @@ describe('Lean mappers reuse shared semantics', () => {
   });
 
   it('maps Active standard and single-actions projects', () => {
-    expect(mapRawLeanProject(rawProject()).kind).toBe('standard');
-    expect(mapRawLeanProject(rawProject({ containsSingletonActions: true })).kind).toBe('single_actions');
+    expect(mapRawLeanProject(rawProject(), NO_DATE).kind).toBe('standard');
+    expect(mapRawLeanProject(
+      rawProject({ containsSingletonActions: true }),
+      NO_DATE,
+    ).kind).toBe('single_actions');
   });
 
   it('maps folder, dates, counts, and compact Active status', () => {
@@ -217,16 +238,21 @@ describe('Lean mappers reuse shared semantics', () => {
       deferDate: null,
       effectiveDeferDate: LATER,
       totalTaskCount: 3,
-    }));
+    }), { direct: EARLIER, effective: EARLIER, source: 'direct' });
     expect(mapped.status).toBe('Active');
     expect(mapped.folder).toEqual({ id: 'f1', name: 'Folder' });
     expect(mapped.dates.due.source).toBe('direct');
+    expect(mapped.dates.planned).toEqual({
+      direct: EARLIER,
+      effective: EARLIER,
+      source: 'direct',
+    });
     expect(mapped.dates.defer.source).toBe('inherited');
     expect(mapped.tasks.total).toBe(3);
   });
 
   it('rejects non-Active projects at Domain mapping', () => {
-    expect(() => mapRawLeanProject(rawProject({ status: 'OnHold' }))).toThrow(/Active/);
+    expect(() => mapRawLeanProject(rawProject({ status: 'OnHold' }), NO_DATE)).toThrow(/Active/);
   });
 });
 
@@ -235,9 +261,9 @@ describe('attentionClassifier', () => {
     [rawTask({ taskStatus: 'Overdue' }), ['overdue']],
     [rawTask({ taskStatus: 'DueSoon' }), ['dueSoon']],
     [rawTask({ plannedDate: EARLIER, effectivePlannedDate: EARLIER }), ['planned']],
-    [rawTask({ plannedDate: null, effectivePlannedDate: EARLIER }), ['planned']],
-    [rawTask({ effectivePlannedDate: GENERATED_AT }), ['planned']],
-    [rawTask({ effectivePlannedDate: LATER }), []],
+    [rawTask({ plannedDate: GENERATED_AT, effectivePlannedDate: GENERATED_AT }), ['planned']],
+    [rawTask({ plannedDate: LATER, effectivePlannedDate: LATER }), []],
+    [rawTask({ plannedDate: null, effectivePlannedDate: EARLIER }), []],
     [rawTask({ taskStatus: 'Blocked', effectivePlannedDate: EARLIER }), []],
     [rawTask({ taskStatus: 'Blocked', plannedDate: EARLIER, effectivePlannedDate: EARLIER }), []],
     [rawTask({ effectiveFlagged: true }), ['flagged']],
@@ -248,6 +274,7 @@ describe('attentionClassifier', () => {
   it('preserves fixed multi-reason order and never adds blocked', () => {
     const task = rawTask({
       taskStatus: 'Overdue',
+      plannedDate: EARLIER,
       effectivePlannedDate: EARLIER,
       effectiveFlagged: true,
     });
@@ -258,6 +285,68 @@ describe('attentionClassifier', () => {
     ]);
     expect(classifyAttentionReasons(rawTask({ taskStatus: 'Blocked' }), GENERATED_AT)).toEqual([]);
   });
+
+  it('does not add planned to inherited tasks with another reason', () => {
+    expect(classifyAttentionReasons(rawTask({
+      effectivePlannedDate: EARLIER,
+      effectiveFlagged: true,
+    }), GENERATED_AT)).toEqual(['flagged']);
+    expect(classifyAttentionReasons(rawTask({
+      taskStatus: 'Overdue',
+      effectivePlannedDate: EARLIER,
+    }), GENERATED_AT)).toEqual(['overdue']);
+  });
+
+  it('allows a direct-planned Action Group exactly once', () => {
+    expect(classifyAttentionReasons(rawTask({
+      hasChildren: true,
+      plannedDate: EARLIER,
+      effectivePlannedDate: EARLIER,
+      effectiveFlagged: true,
+    }), GENERATED_AT)).toEqual(['planned', 'flagged']);
+    expect(classifyAttentionReasons(rawTask({
+      hasChildren: true,
+      plannedDate: null,
+      effectivePlannedDate: EARLIER,
+    }), GENERATED_AT)).toEqual([]);
+  });
+});
+
+describe('Project Planned resolver and classifier', () => {
+  it('joins the canonical Project ID to its root Task and preserves date semantics', () => {
+    const project = rawProject({ id: 'p1' });
+    const resolved = resolveProjectPlannedDates([
+      projectRoot(project, { plannedDate: EARLIER, effectivePlannedDate: LATER }),
+    ], [project]);
+    expect(resolved.get('p1')).toEqual({
+      direct: EARLIER,
+      effective: LATER,
+      source: 'direct',
+    });
+  });
+
+  it('rejects missing, wrong-kind, and duplicate roots', () => {
+    const project = rawProject({ id: 'p1' });
+    expect(() => resolveProjectPlannedDates([], [project])).toThrow(/Missing Project root/);
+    expect(() => resolveProjectPlannedDates([
+      rawTask({ id: 'p1', isProjectRoot: false }),
+    ], [project])).toThrow(/Missing Project root/);
+    expect(() => resolveProjectPlannedDates([
+      projectRoot(project),
+      projectRoot(project),
+    ], [project])).toThrow(/Duplicate Project root/);
+  });
+
+  it.each([
+    [{ direct: EARLIER, effective: EARLIER, source: 'direct' }, true],
+    [{ direct: GENERATED_AT, effective: GENERATED_AT, source: 'direct' }, true],
+    [{ direct: LATER, effective: LATER, source: 'direct' }, false],
+    [{ direct: null, effective: EARLIER, source: 'inherited' }, false],
+    [NO_DATE, false],
+  ] as const)('classifies Project Planned fixture %#', (planned, expected) => {
+    const project = mapRawLeanProject(rawProject(), planned);
+    expect(isProjectPlannedReady(project, GENERATED_AT)).toBe(expected);
+  });
 });
 
 describe('snapshot sorting and composition', () => {
@@ -266,16 +355,17 @@ describe('snapshot sorting and composition', () => {
   });
 
   it('sorts root projects before folder projects and applies stable ties', () => {
+    const projects = [
+      rawProject({ id: 'p3', name: 'A', folderId: 'f2', folderName: 'Folder' }),
+      rawProject({ id: 'p2', name: 'B' }),
+      rawProject({ id: 'p1', name: 'A' }),
+      rawProject({ id: 'p4', name: 'A', folderId: 'f1', folderName: 'Folder' }),
+    ];
     const snapshot = composeLeanSnapshot({
       generatedAt: GENERATED_AT,
       limitPerSection: 10,
-      tasks: [],
-      projects: [
-        rawProject({ id: 'p3', name: 'A', folderId: 'f2', folderName: 'Folder' }),
-        rawProject({ id: 'p2', name: 'B' }),
-        rawProject({ id: 'p1', name: 'A' }),
-        rawProject({ id: 'p4', name: 'A', folderId: 'f1', folderName: 'Folder' }),
-      ],
+      tasks: projects.map(project => projectRoot(project)),
+      projects,
     });
     expect(snapshot.projects.active.items.map(project => project.id)).toEqual(['p1', 'p2', 'p4', 'p3']);
   });
@@ -307,17 +397,25 @@ describe('snapshot sorting and composition', () => {
     expect(snapshot.attention.items.map(item => item.task.id)).toEqual(['direct', 'inherited']);
   });
 
-  it('sorts direct planned before inherited planned', () => {
+  it('sorts direct-planned owners by direct date and excludes inherited-only tasks', () => {
     const snapshot = composeLeanSnapshot({
       generatedAt: GENERATED_AT,
       limitPerSection: 10,
       projects: [],
       tasks: [
         rawTask({ id: 'inherited', effectivePlannedDate: '2026-07-01T00:00:00Z' }),
-        rawTask({ id: 'direct', plannedDate: EARLIER, effectivePlannedDate: EARLIER }),
+        rawTask({ id: 'later-direct', plannedDate: EARLIER, effectivePlannedDate: EARLIER }),
+        rawTask({
+          id: 'earlier-direct',
+          plannedDate: '2026-07-08T12:00:00.000Z',
+          effectivePlannedDate: '2026-07-08T12:00:00.000Z',
+        }),
       ],
     });
-    expect(snapshot.attention.items.map(item => item.task.id)).toEqual(['direct', 'inherited']);
+    expect(snapshot.attention.items.map(item => item.task.id)).toEqual([
+      'earlier-direct',
+      'later-direct',
+    ]);
   });
 
   it('sorts flagged tasks by planned date, then due date, then name and id', () => {
@@ -345,15 +443,21 @@ describe('snapshot sorting and composition', () => {
       id: 'multi',
       inInbox: true,
       taskStatus: 'Overdue',
+      plannedDate: EARLIER,
       effectivePlannedDate: EARLIER,
       effectiveFlagged: true,
       creationDate: EARLIER,
     });
+    const projects = [rawProject({ id: 'p2', name: 'B' }), rawProject({ id: 'p1', name: 'A' })];
     const snapshot = composeLeanSnapshot({
       generatedAt: GENERATED_AT,
       limitPerSection: 1,
-      projects: [rawProject({ id: 'p2', name: 'B' }), rawProject({ id: 'p1', name: 'A' })],
-      tasks: [multi, rawTask({ id: 'flag', effectiveFlagged: true })],
+      projects,
+      tasks: [
+        multi,
+        rawTask({ id: 'flag', effectiveFlagged: true }),
+        ...projects.map(project => projectRoot(project)),
+      ],
     });
     expect(snapshot.attention.total).toBe(2);
     expect(snapshot.attention.returned).toBe(1);
@@ -362,6 +466,144 @@ describe('snapshot sorting and composition', () => {
     expect(snapshot.attention.items[0].reasons).toEqual(['overdue', 'planned', 'flagged']);
     expect(snapshot.inbox.items[0].id).toBe('multi');
     expect(snapshot.projects.active).toMatchObject({ total: 2, returned: 1, truncated: true });
+  });
+
+  it('represents a direct-planned workflow once without inherited child fan-out', () => {
+    const project = rawProject({
+      id: 'weekly',
+      name: 'Weekly Review',
+      totalTaskCount: 8,
+      taskStatusCounts: {
+        ...rawProject().taskStatusCounts,
+        available: 7,
+        next: 1,
+      },
+    });
+    const children = Array.from({ length: 8 }, (_, index) => rawTask({
+      id: `weekly-child-${index}`,
+      name: `Child ${index}`,
+      taskStatus: index === 7 ? 'Next' : 'Available',
+      projectId: project.id,
+      projectName: project.name,
+      effectivePlannedDate: EARLIER,
+    }));
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects: [project],
+      tasks: [
+        projectRoot(project, {
+          taskStatus: 'Blocked',
+          plannedDate: EARLIER,
+          effectivePlannedDate: EARLIER,
+        }),
+        ...children,
+      ],
+    });
+
+    expect(snapshot.projects.active.items.map(item => item.id)).toEqual(['weekly']);
+    expect(snapshot.projects.planned).toMatchObject({
+      total: 1,
+      returned: 1,
+      truncated: false,
+    });
+    expect(snapshot.projects.planned.items.map(item => item.id)).toEqual(['weekly']);
+    expect(snapshot.projects.planned.items[0].dates.planned).toEqual({
+      direct: EARLIER,
+      effective: EARLIER,
+      source: 'direct',
+    });
+    expect(snapshot.attention.total).toBe(0);
+    expect(snapshot.attention.byReason.planned).toBe(0);
+    expect(snapshot.attention.items.flatMap(item => item.reasons)).not.toContain('planned');
+  });
+
+  it('prevents Daily Reset-style inherited Planned fan-out', () => {
+    const project = rawProject({ id: 'daily', name: 'Daily Reset' });
+    const children = Array.from({ length: 6 }, (_, index) => rawTask({
+      id: `daily-child-${index}`,
+      taskStatus: index === 5 ? 'Next' : 'Available',
+      projectId: project.id,
+      projectName: project.name,
+      effectivePlannedDate: EARLIER,
+    }));
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects: [project],
+      tasks: [
+        projectRoot(project, {
+          plannedDate: GENERATED_AT,
+          effectivePlannedDate: GENERATED_AT,
+        }),
+        ...children,
+      ],
+    });
+    expect(snapshot.projects.planned.items.map(item => item.id)).toEqual(['daily']);
+    expect(snapshot.attention.byReason.planned).toBe(0);
+  });
+
+  it('derives planned Projects from the full Active set before independent truncation', () => {
+    const projects = Array.from({ length: 30 }, (_, index) => rawProject({
+      id: `p-${String(index).padStart(2, '0')}`,
+      name: `Project ${String(index).padStart(2, '0')}`,
+    }));
+    const plannedId = 'p-29';
+    const tasks = projects.map(project => projectRoot(project, project.id === plannedId
+      ? { plannedDate: EARLIER, effectivePlannedDate: EARLIER }
+      : {}));
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects,
+      tasks,
+    });
+
+    expect(snapshot.projects.active).toMatchObject({ total: 30, returned: 25, truncated: true });
+    expect(snapshot.projects.active.items.map(item => item.id)).not.toContain(plannedId);
+    expect(snapshot.projects.planned).toMatchObject({ total: 1, returned: 1, truncated: false });
+    expect(snapshot.projects.planned.items.map(item => item.id)).toEqual([plannedId]);
+  });
+
+  it('sorts planned Projects by direct date, then UTF-16 name and id', () => {
+    const earliest = '2026-07-08T12:00:00.000Z';
+    const projects = [
+      rawProject({ id: 'b', name: 'A' }),
+      rawProject({ id: 'later', name: 'A' }),
+      rawProject({ id: 'a', name: 'A' }),
+    ];
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 10,
+      projects,
+      tasks: projects.map(project => projectRoot(project, {
+        plannedDate: project.id === 'later' ? EARLIER : earliest,
+        effectivePlannedDate: project.id === 'later' ? EARLIER : earliest,
+      })),
+    });
+    expect(snapshot.projects.planned.items.map(item => item.id)).toEqual(['a', 'b', 'later']);
+  });
+
+  it('counts and truncates planned Projects independently', () => {
+    const projects = Array.from({ length: 35 }, (_, index) => rawProject({
+      id: `planned-${String(index).padStart(2, '0')}`,
+      name: `Planned ${String(index).padStart(2, '0')}`,
+    }));
+    const snapshot = composeLeanSnapshot({
+      generatedAt: GENERATED_AT,
+      limitPerSection: 25,
+      projects,
+      tasks: projects.map(project => projectRoot(project, {
+        plannedDate: EARLIER,
+        effectivePlannedDate: EARLIER,
+      })),
+    });
+    expect(snapshot.projects.planned).toMatchObject({
+      total: 35,
+      returned: 25,
+      truncated: true,
+    });
+    expect(snapshot.projects.planned.items).toHaveLength(25);
   });
 
   it('caps Inbox after stable sorting while preserving full totals', () => {
@@ -399,7 +641,10 @@ describe('snapshot sorting and composition', () => {
     expect(snapshot).toMatchObject({
       generatedAt: GENERATED_AT,
       scope: 'all',
-      projects: { active: { total: 0, returned: 0, truncated: false, items: [] } },
+      projects: {
+        active: { total: 0, returned: 0, truncated: false, items: [] },
+        planned: { total: 0, returned: 0, truncated: false, items: [] },
+      },
       attention: { total: 0, returned: 0, truncated: false, items: [] },
       inbox: { total: 0, returned: 0, truncated: false, items: [] },
     });
