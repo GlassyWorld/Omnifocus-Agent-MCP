@@ -680,6 +680,23 @@ get_completed_since          历史完成事件
 
 因此它是 materialized management view / application read model，而不是筛选语法的包装。
 
+### 5.5 Domain Tool output contracts
+
+四个 Domain Tool 的最终 View 现在各自拥有与 TypeScript Domain 类型建立编译期联系的
+运行时 Zod Schema，并在 MCP Tool descriptor 中声明 `outputSchema`。Schema 的事实来源
+是现有 strict Adapter、Mapper/Composer、Domain 类型和测试，而不是 Raw OmniFocus/JXA
+对象或通用 query 输出。
+
+成功 handler 只构造一次 `{ success: true, ... }` payload，Schema 验证后将同一对象作为
+`structuredContent` 返回，并序列化为原有 JSON `content`，从而同时提供机器契约和旧客户
+端兼容性。验证失败不会发送部分可信成功结果，而是沿用 `query_failed`。既有错误响应继续
+使用错误码、JSON 文本和 `isError: true`，默认不返回 `structuredContent`，因为
+`outputSchema` 只描述成功的 Domain envelope。
+
+本次没有改变 Domain semantics、input schema、Tool 集合或 Profile boundary，也没有为
+其余 upstream 通用/写入 Tool 批量补充输出 Schema；这些旧 Tool 保持原注册和返回契约，
+避免将未建模的文本接口误标为稳定 Domain contract。
+
 ---
 
 ## 6. Semantic Rules

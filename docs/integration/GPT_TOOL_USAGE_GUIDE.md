@@ -101,6 +101,20 @@ Domain Read Tools，并且不注册 Resources。
 
 这些 Tool 返回的是 AI-facing Domain View，不是简单 Raw query。
 
+#### Structured output contract
+
+四个 Domain Tool 均在 MCP descriptor 中声明 `outputSchema`。成功结果通过
+`structuredContent` 提供经过运行时 Zod Schema 验证的机器结构，同时继续在 `content`
+中返回同一 payload 的 JSON 文本，以兼容已有客户端。客户端进行程序化处理时应优先使用
+`structuredContent`；两种表示的内容相同。
+
+这些 Schema 只描述 `TaskView`、`ProjectView`、`CompletedTaskView` 和
+`LeanSnapshotView` 中的 Domain facts，不包含 health、risk、priority、recommendation
+或其他 AI inference。错误结果继续使用既有 `invalid_arguments`、`not_found`、
+`ambiguous_match`、`query_failed` 与 `isError: true`，默认不返回
+`structuredContent`。输出 Schema 不改变 Tool routing、最小充分调用原则或 Profile
+capability boundary。
+
 ### B. Generic Read Tools
 
 #### 实际注册的 generic read tools

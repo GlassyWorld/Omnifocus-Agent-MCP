@@ -26,7 +26,30 @@ For analytical answers, normally separate Confirmed facts, Analysis / inference,
 
 ## 2. Design Notes
 
-本文件面向 ChatGPT Developer App，负责压缩表达 Tool routing、最小调用原则、错误处理和回答分层；`src/serverInstructions.ts` 则随 MCP Server 启动，为客户端提供更短的 Profile 内建提示。两层提示应保持同一工具路由，但职责不同：Server Instructions 只提供服务端可见的最低限度导航，App 版本还约束时间范围、截断披露以及事实与推断分离。真正的能力与安全边界由 Server-side `personal-readonly` Profile 的注册表实现，而不是由可被覆盖的 App Instructions 保证；即使客户端忽略提示，注册边界仍会阻止未公开调用，反之仅靠提示也不能替代服务端配置。该 Profile 只公开四个 Domain read tools，也不注册 Resources，因此不能沿用完整 Guide 中依赖 `query_omnifocus` 发现候选对象的消歧流程。当前重名错误只返回错误码和通用消息，不提供候选列表，所以只能利用对话和错误中已有上下文，并请用户补充准确名称、ID 或区分信息，不能承诺列举 Tool 未返回的对象。完整 Guide 同时描述 upstream-compatible surface、长期编排规则、反模式和维护契约，篇幅较大且部分能力不适用于当前 App；原样粘贴会增加无效上下文并可能诱导调用未公开能力。本文件因此只保留生产运行所需规则，但不替代 Guide、代码、测试或 Accepted ADR。
+当前 ChatGPT Developer App 没有独立的 App Instructions 输入框。因此，本文件的
+`Paste-ready Instructions` 同时是 `personal-readonly` MCP Server Instructions 的规范内容
+来源，由 `src/serverInstructions.ts` 通过 MCP initialize response 的 `instructions` 字段
+提供给 ChatGPT。生产版本发布后，需要在 ChatGPT App 中执行 Refresh，才能重新获取更新
+后的 Server Instructions。
+
+真正的能力与安全边界仍由 Server-side `personal-readonly` Profile 的注册表实现，而不是
+由 Instructions 保证；文档内容不能替代代码、测试或 Profile enforcement。即使客户端忽略
+提示，注册边界仍会阻止未公开调用，反之仅靠文档或提示也不能创建只读边界。该 Profile
+只公开四个 Domain read tools，也不注册 Resources，因此不能沿用完整 Guide 中依赖
+`query_omnifocus` 发现候选对象的消歧流程。当前重名错误只返回错误码和通用消息，不提供
+候选列表，所以只能利用对话和错误中已有上下文，并请用户补充准确名称、ID 或区分信息，
+不能承诺列举 Tool 未返回的对象。
+
+完整 Guide 同时描述 upstream-compatible surface、长期编排规则、反模式和维护契约，篇幅
+较大且部分能力不适用于当前 App；原样使用会增加无效上下文并可能诱导调用未公开能力。
+本文件只保留 `personal-readonly` 生产运行所需规则，但不替代 Guide、代码、测试或
+Accepted ADR。
+
+四个 Domain Tool 现在还通过 MCP `outputSchema` 声明结构化输出契约。成功响应同时提供
+经过运行时验证的 `structuredContent` 和兼容 JSON 文本 `content`；客户端进行机器处理时
+应优先读取 `structuredContent`。该契约只描述 Domain facts。App / Server Instructions
+仍负责 Tool routing、事实与推断分离以及 Snapshot 截断解释；`outputSchema` 不能替代
+Server Instructions，也不改变 Server-side Profile 的能力与安全边界。
 
 ## 3. Acceptance Scenarios
 
