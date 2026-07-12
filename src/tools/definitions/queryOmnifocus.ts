@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { queryOmnifocus, QueryOmnifocusParams } from '../primitives/queryOmnifocus.js';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { resolveDateFilter } from '../../utils/dateFilter.js';
 
 export const schema = z.object({

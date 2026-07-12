@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { batchAddItems, BatchAddItemsParams } from '../primitives/batchAddItems.js';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 
 export const schema = z.object({
   items: z.array(z.object({

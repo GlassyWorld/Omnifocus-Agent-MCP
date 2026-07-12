@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { mapRawCompletedTaskToView } from '../../domain/completion/completionMapper.js';
 import { getCompletedSince } from '../primitives/getCompletedSince.js';
 import { ToolErrorCode } from '../types/toolErrors.js';

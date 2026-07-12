@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { createTag } from '../primitives/createTag.js';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 
 export const schema = z.object({
   name: z.string().describe("Name of the tag to create"),

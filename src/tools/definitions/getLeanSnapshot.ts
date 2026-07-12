@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { getLeanSnapshot } from '../primitives/getLeanSnapshot.js';
 import { ToolErrorCode } from '../types/toolErrors.js';
 

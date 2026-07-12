@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { removeItem, RemoveItemParams } from '../primitives/removeItem.js';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 
 export const schema = z.object({
   id: z.string().optional().describe("The ID of the task or project to remove"),

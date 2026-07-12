@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { mapRawTaskToTaskView } from '../../domain/task/taskMapper.js';
 import { getTask } from '../primitives/getTask.js';
 import { ToolErrorCode } from '../types/toolErrors.js';

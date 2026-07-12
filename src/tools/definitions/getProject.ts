@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { mapRawProjectToProjectView } from '../../domain/project/projectMapper.js';
 import { getProject } from '../primitives/getProject.js';
 import { ToolErrorCode } from '../types/toolErrors.js';

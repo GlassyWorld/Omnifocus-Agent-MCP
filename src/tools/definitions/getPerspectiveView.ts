@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getPerspectiveView } from '../primitives/getPerspectiveView.js';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 
 export const schema = z.object({
   perspectiveName: z.string().describe("Name of the perspective to view (e.g., 'Inbox', 'Projects', 'Flagged', or custom perspective name)"),

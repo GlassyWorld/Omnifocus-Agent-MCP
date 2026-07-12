@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { listPerspectives } from '../primitives/listPerspectives.js';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 
 export const schema = z.object({
   includeBuiltIn: z.boolean().optional().describe("Include built-in perspectives (Inbox, Projects, Tags, etc.). Default: true"),
