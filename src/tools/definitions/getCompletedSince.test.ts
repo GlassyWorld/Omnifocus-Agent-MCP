@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RawCompletedTask } from '../../domain/completion/completionTypes.js';
+import { getCompletedSinceSuccessSchema } from '../../domain/completion/completionSchemas.js';
 import { getCompletedSince } from '../primitives/getCompletedSince.js';
 import { _testExports, handler } from './getCompletedSince.js';
 
@@ -96,6 +97,7 @@ describe('getCompletedSince handler', () => {
   it('returns invalid_arguments for missing since', async () => {
     const result = await handler({}, {} as any);
     expect(parseResponse(result).error.code).toBe('invalid_arguments');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('returns invalid_arguments for an invalid interval', async () => {
@@ -112,7 +114,14 @@ describe('getCompletedSince handler', () => {
       since: '2026-07-01T00:00:00.000Z',
       until: '2026-07-02T00:00:00.000Z',
     }, {} as any);
-    expect(parseResponse(result)).toEqual({ success: true, completed: [] });
+    const body = parseResponse(result);
+    expect(body).toEqual({ success: true, completed: [] });
+    expect(result).not.toHaveProperty('isError');
+    expect(result).toHaveProperty('structuredContent');
+    if ('structuredContent' in result) {
+      expect(getCompletedSinceSuccessSchema.parse(result.structuredContent)).toEqual(body);
+      expect(result.structuredContent).toEqual(body);
+    }
   });
 
   it('maps completion events without status or raw fields', async () => {
@@ -127,6 +136,10 @@ describe('getCompletedSince handler', () => {
     expect(event).not.toHaveProperty('raw');
     expect(event).not.toHaveProperty('status');
     expect(event).not.toHaveProperty('taskStatus');
+    expect(result).toHaveProperty('structuredContent');
+    if ('structuredContent' in result) {
+      expect(result.structuredContent).toEqual(parseResponse(result));
+    }
   });
 
   it('returns query_failed for primitive failure', async () => {
@@ -136,5 +149,6 @@ describe('getCompletedSince handler', () => {
       until: '2026-07-02T00:00:00.000Z',
     }, {} as any);
     expect(parseResponse(result).error.code).toBe('query_failed');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 });

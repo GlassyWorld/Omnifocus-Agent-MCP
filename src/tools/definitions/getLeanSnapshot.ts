@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { getLeanSnapshot } from '../primitives/getLeanSnapshot.js';
+import {
+  getLeanSnapshotOutputSchema,
+  getLeanSnapshotSuccessSchema,
+} from '../../domain/snapshot/snapshotSchemas.js';
 import { ToolErrorCode } from '../types/toolErrors.js';
 
 const DEFAULT_LIMIT_PER_SECTION = 25;
@@ -10,6 +14,8 @@ export const schema = z.object({
     'Maximum items returned independently for active projects, planned projects, project deadlines, attention, and Inbox. Integer from 1 through 100. Defaults to 25.',
   ),
 });
+
+export const outputSchema = getLeanSnapshotOutputSchema;
 
 type ToolArgs = z.infer<typeof schema>;
 type Clock = () => Date;
@@ -33,10 +39,14 @@ async function handleWithClock(args: ToolArgs, extra: RequestHandlerExtra, clock
       return errorResponse('query_failed', result.error);
     }
 
+    const payload = { success: true as const, snapshot: result.snapshot };
+    const structuredContent = getLeanSnapshotSuccessSchema.parse(payload);
+
     return {
+      structuredContent,
       content: [{
         type: 'text' as const,
-        text: JSON.stringify({ success: true, snapshot: result.snapshot }, null, 2),
+        text: JSON.stringify(structuredContent, null, 2),
       }],
     };
   } catch (error) {

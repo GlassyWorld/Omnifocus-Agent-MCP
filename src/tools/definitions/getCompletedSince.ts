@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { mapRawCompletedTaskToView } from '../../domain/completion/completionMapper.js';
+import {
+  getCompletedSinceOutputSchema,
+  getCompletedSinceSuccessSchema,
+} from '../../domain/completion/completionSchemas.js';
 import { getCompletedSince } from '../primitives/getCompletedSince.js';
 import { ToolErrorCode } from '../types/toolErrors.js';
 
@@ -10,6 +14,8 @@ export const schema = z.object({
   since: z.string().optional().describe("Required ISO 8601 datetime with Z or explicit UTC offset. The inclusive lower completion time bound."),
   until: z.string().optional().describe("Optional ISO 8601 datetime with Z or explicit UTC offset. Defaults to the current time and is inclusive."),
 });
+
+export const outputSchema = getCompletedSinceOutputSchema;
 
 type ToolArgs = z.infer<typeof schema>;
 
@@ -33,13 +39,17 @@ export async function handler(args: ToolArgs, extra: RequestHandlerExtra) {
       return errorResponse("query_failed", result.error);
     }
 
+    const payload = {
+      success: true as const,
+      completed: result.tasks.map(mapRawCompletedTaskToView),
+    };
+    const structuredContent = getCompletedSinceSuccessSchema.parse(payload);
+
     return {
+      structuredContent,
       content: [{
         type: "text" as const,
-        text: JSON.stringify({
-          success: true,
-          completed: result.tasks.map(mapRawCompletedTaskToView),
-        }, null, 2),
+        text: JSON.stringify(structuredContent, null, 2),
       }],
     };
   } catch (err: unknown) {

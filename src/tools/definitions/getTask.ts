@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import type { RequestHandlerExtra } from '../../types/sdkProtocolCompat.js';
 import { mapRawTaskToTaskView } from '../../domain/task/taskMapper.js';
+import {
+  getTaskOutputSchema,
+  getTaskSuccessSchema,
+} from '../../domain/task/taskSchemas.js';
 import { getTask } from '../primitives/getTask.js';
 import { ToolErrorCode } from '../types/toolErrors.js';
 
@@ -8,6 +12,8 @@ export const schema = z.object({
   id: z.string().optional().describe("Exact OmniFocus task ID. Provide either id or name, not both."),
   name: z.string().optional().describe("Exact OmniFocus task name. Case-sensitive. Provide either name or id, not both."),
 });
+
+export const outputSchema = getTaskOutputSchema;
 
 export async function handler(args: z.infer<typeof schema>, extra: RequestHandlerExtra) {
   const validationError = validateArgs(args);
@@ -34,13 +40,17 @@ export async function handler(args: z.infer<typeof schema>, extra: RequestHandle
       return errorResponse("ambiguous_match", "More than one task matched the exact locator.");
     }
 
+    const payload = {
+      success: true as const,
+      task: mapRawTaskToTaskView(result.tasks[0]),
+    };
+    const structuredContent = getTaskSuccessSchema.parse(payload);
+
     return {
+      structuredContent,
       content: [{
         type: "text" as const,
-        text: JSON.stringify({
-          success: true,
-          task: mapRawTaskToTaskView(result.tasks[0]),
-        }, null, 2),
+        text: JSON.stringify(structuredContent, null, 2),
       }],
     };
   } catch (err: unknown) {

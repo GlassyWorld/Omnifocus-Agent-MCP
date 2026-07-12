@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handler, schema } from './getTask.js';
 import { getTask } from '../primitives/getTask.js';
 import { RawTask } from '../../domain/task/taskTypes.js';
+import { getTaskSuccessSchema } from '../../domain/task/taskSchemas.js';
 
 vi.mock('../primitives/getTask.js', () => ({
   getTask: vi.fn(),
@@ -93,6 +94,7 @@ describe('getTask handler', () => {
     mockedGetTask.mockResolvedValue({ success: true, tasks: [], count: 0 });
     const result = await handler({ id: 'missing' }, {} as any);
     expect(parseResponse(result).error.code).toBe('not_found');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('returns success for one result', async () => {
@@ -102,23 +104,51 @@ describe('getTask handler', () => {
     expect(body.success).toBe(true);
     expect(body.task.id).toBe('task-1');
     expect(body.task).not.toHaveProperty('raw');
+    expect(result).not.toHaveProperty('isError');
+    expect(result).toHaveProperty('structuredContent');
+    if ('structuredContent' in result) {
+      expect(getTaskSuccessSchema.parse(result.structuredContent)).toEqual(body);
+      expect(result.structuredContent).toEqual(body);
+    }
   });
 
   it('returns ambiguous_match for two results', async () => {
     mockedGetTask.mockResolvedValue({ success: true, tasks: [baseRawTask, { ...baseRawTask, id: 'task-2' }], count: 2 });
-    const result = await handler({ name: 'Task 1' }, {} as any);
+    const result = await handler(
+      { name: 'Task 1' },
+      {} as Parameters<typeof handler>[1],
+    );
     expect(parseResponse(result).error.code).toBe('ambiguous_match');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('returns query_failed for primitive failure', async () => {
     mockedGetTask.mockResolvedValue({ success: false, error: 'boom' });
     const result = await handler({ id: 'task-1' }, {} as any);
     expect(parseResponse(result).error.code).toBe('query_failed');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('returns query_failed for thrown errors', async () => {
     mockedGetTask.mockRejectedValue(new Error('adapter failure'));
     const result = await handler({ id: 'task-1' }, {} as any);
     expect(parseResponse(result).error.code).toBe('query_failed');
+  });
+
+  it('maps output contract drift to query_failed without partial structured content', async () => {
+    const malformedRawTask = {
+      ...baseRawTask,
+      id: 42,
+    } as unknown as RawTask;
+    mockedGetTask.mockResolvedValue({ success: true, tasks: [malformedRawTask], count: 1 });
+
+    const result = await handler(
+      { name: 'Task 1' },
+      {} as Parameters<typeof handler>[1],
+    );
+
+    expect(result.isError).toBe(true);
+    expect(parseResponse(result).error.code).toBe('query_failed');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 });

@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ZodRawShape } from "zod";
-import { ServerProfile } from "./config/serverProfile.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ZodRawShape } from "zod";
+import type { ServerProfile } from "./config/serverProfile.js";
 import { registerResources } from "./resources/index.js";
 import { Logger } from "./utils/logger.js";
+import type { RequestHandlerExtra } from "./types/sdkProtocolCompat.js";
 
 import * as dumpDatabaseTool from "./tools/definitions/dumpDatabase.js";
 import * as addOmniFocusTaskTool from "./tools/definitions/addOmniFocusTask.js";
@@ -23,7 +25,31 @@ import * as createTagTool from "./tools/definitions/createTag.js";
 
 type ToolModule = {
   schema: { shape: ZodRawShape };
+  outputSchema?: ZodRawShape;
   handler: unknown;
+};
+
+type RegistryToolHandler = (
+  args: Record<string, unknown>,
+  extra: RequestHandlerExtra,
+) => CallToolResult | Promise<CallToolResult>;
+
+type RegistryMcpServer = {
+  registerTool(
+    name: string,
+    config: {
+      description?: string;
+      inputSchema: ZodRawShape;
+      outputSchema: ZodRawShape;
+    },
+    handler: RegistryToolHandler,
+  ): void;
+  tool(
+    name: string,
+    description: string,
+    inputSchema: ZodRawShape,
+    handler: RegistryToolHandler,
+  ): void;
 };
 
 type ToolRegistration = {
@@ -144,14 +170,28 @@ export function registerToolsForProfile(
   const registrations = profile === "personal-readonly"
     ? TOOL_REGISTRY.filter(({ personalReadonly }) => personalReadonly)
     : TOOL_REGISTRY;
+  const registryServer = server as RegistryMcpServer;
 
   for (const registration of registrations) {
-    server.tool(
-      registration.name,
-      registration.description,
-      registration.tool.schema.shape,
-      registration.tool.handler as never
-    );
+    const handler = registration.tool.handler as RegistryToolHandler;
+    if (registration.tool.outputSchema) {
+      registryServer.registerTool(
+        registration.name,
+        {
+          description: registration.description,
+          inputSchema: registration.tool.schema.shape,
+          outputSchema: registration.tool.outputSchema,
+        },
+        handler,
+      );
+    } else {
+      registryServer.tool(
+        registration.name,
+        registration.description,
+        registration.tool.schema.shape,
+        handler,
+      );
+    }
   }
 }
 

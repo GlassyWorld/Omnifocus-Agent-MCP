@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLeanSnapshot } from '../primitives/getLeanSnapshot.js';
 import { _testExports, handler, schema } from './getLeanSnapshot.js';
+import { getLeanSnapshotSuccessSchema } from '../../domain/snapshot/snapshotSchemas.js';
 
 vi.mock('../primitives/getLeanSnapshot.js', () => ({ getLeanSnapshot: vi.fn() }));
 const mockedGetLeanSnapshot = vi.mocked(getLeanSnapshot);
@@ -42,7 +43,13 @@ describe('getLeanSnapshot Tool', () => {
       generatedAt: emptySnapshot.generatedAt,
       limitPerSection: 25,
     });
-    expect(parseResponse(response)).toEqual({ success: true, snapshot: emptySnapshot });
+    const body = parseResponse(response);
+    expect(body).toEqual({ success: true, snapshot: emptySnapshot });
+    expect(response).toHaveProperty('structuredContent');
+    if ('structuredContent' in response) {
+      expect(getLeanSnapshotSuccessSchema.parse(response.structuredContent)).toEqual(body);
+      expect(response.structuredContent).toEqual(body);
+    }
   });
 
   it.each([1, 25, 100])('accepts explicit limit %s', async limitPerSection => {
@@ -84,6 +91,11 @@ describe('getLeanSnapshot Tool', () => {
     const payload = parseResponse(response);
     expect(payload.success).toBe(true);
     expect(payload.snapshot).toEqual(emptySnapshot);
+    expect(response).not.toHaveProperty('isError');
+    expect(response).toHaveProperty('structuredContent');
+    if ('structuredContent' in response) {
+      expect(response.structuredContent).toEqual(payload);
+    }
   });
 
   it('returns query_failed for primitive failure', async () => {
@@ -94,6 +106,7 @@ describe('getLeanSnapshot Tool', () => {
       success: false,
       error: { code: 'query_failed', message: 'snapshot failed' },
     });
+    expect(response).not.toHaveProperty('structuredContent');
   });
 
   it('does not expose forbidden Snapshot concepts', async () => {

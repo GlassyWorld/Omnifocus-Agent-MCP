@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RawProject } from '../../domain/project/projectTypes.js';
+import { getProjectSuccessSchema } from '../../domain/project/projectSchemas.js';
 import { getProject } from '../primitives/getProject.js';
 import { handler, schema } from './getProject.js';
 
@@ -88,6 +89,7 @@ describe('getProject handler', () => {
     mockedGetProject.mockResolvedValue({ success: true, projects: [], count: 0 });
     const result = await handler({ id: 'missing' }, {} as any);
     expect(parseResponse(result).error.code).toBe('not_found');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('returns success for one project', async () => {
@@ -97,6 +99,12 @@ describe('getProject handler', () => {
     expect(body.success).toBe(true);
     expect(body.project.id).toBe('project-root-1');
     expect(body.project).not.toHaveProperty('raw');
+    expect(result).not.toHaveProperty('isError');
+    expect(result).toHaveProperty('structuredContent');
+    if ('structuredContent' in result) {
+      expect(getProjectSuccessSchema.parse(result.structuredContent)).toEqual(body);
+      expect(result.structuredContent).toEqual(body);
+    }
   });
 
   it('returns ambiguous_match for two projects', async () => {
@@ -107,12 +115,14 @@ describe('getProject handler', () => {
     });
     const result = await handler({ name: 'Project 1' }, {} as any);
     expect(parseResponse(result).error.code).toBe('ambiguous_match');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('returns query_failed for primitive failure', async () => {
     mockedGetProject.mockResolvedValue({ success: false, error: 'boom' });
     const result = await handler({ id: 'project-root-1' }, {} as any);
     expect(parseResponse(result).error.code).toBe('query_failed');
+    expect(result).not.toHaveProperty('structuredContent');
   });
 
   it('returns query_failed for thrown errors', async () => {
