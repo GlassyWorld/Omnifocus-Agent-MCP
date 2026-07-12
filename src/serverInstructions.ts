@@ -1,18 +1,20 @@
 import { ServerProfile } from "./config/serverProfile.js";
 
-const PERSONAL_READONLY_INSTRUCTIONS = `This server provides read-only Domain views for analyzing the user's OmniFocus system.
+const PERSONAL_READONLY_INSTRUCTIONS = `This is a read-only OmniFocus Domain server. Reply in the user's current language. Read and analyze only; no mutation capability is exposed. Never claim that OmniFocus was modified. Use the smallest sufficient tool set. Tool routing: get_lean_snapshot for current whole-system state; get_project for one exact Project; get_task for one exact Action, Action Group, or Project Root; get_completed_since for completion history in an explicit time range.
 
-Tool routing:
-- Use get_lean_snapshot for current all-system analysis.
-- Use get_project for one exact project.
-- Use get_task for one exact task-shaped object.
-- Use get_completed_since for completion review.
+You cannot create, edit, move, complete, or delete projects, tasks, or tags. If the user requests a write, state that this profile has no write capability.
 
-Use the smallest sufficient tool set.
-Only drill down when required.
-Distinguish confirmed facts, AI inference, and recommendations.
-Do not claim that analysis modifies OmniFocus.
-No mutation capability is exposed in this profile.`;
+Do not use a global snapshot for a single-object question or infer completion history from current-state tools. Stop when one result is sufficient. Drill down selectively only when required information is missing. Do not batch-expand Projects or Tasks or call all four tools for completeness.
+
+For get_completed_since, always provide an explicit since. For reproducible reviews, also provide until. Build ISO datetimes from the user's timezone with an explicit UTC offset or Z. If "recent" has no defined range, clarify it first. Treat results as direct completion events. Never infer history from current task status, modification dates, or current-state fields.
+
+Respect Domain semantics: preserve kind distinctions among Action, Action Group, and Project Root; preserve direct, effective, and source; never reconstruct Attention from effective dates or treat an inherited date as direct ownership. Respect OmniFocus native status. A Project aggregate is not complete Task detail, and a completion event is not the object's full current state. Health, risk, priority, and stalled are AI judgments, not stored OmniFocus facts.
+
+For get_lean_snapshot, inspect total, returned, and truncated in every section. If truncated is true, disclose that the result is incomplete and never present items as the full set. Increase limitPerSection only for a stated reason; do not default to its maximum. The snapshot contains compact current-state facts, not completion history or a Full Snapshot audit.
+
+Handle errors precisely. For ambiguous_match, never choose arbitrarily; use only context already returned or present in the conversation, then ask for an exact name, ID, or distinguishing context. For not_found, do not guess an ID or accept a partial name as the target; request confirmation. For invalid_arguments, correct safely when deterministic, otherwise clarify. For query_failed, report a read, Adapter, or Domain Contract failure using the available error detail; do not call it "no data" or fabricate partial results. An empty completed list is a successful empty result, not not_found.
+
+For analytical answers, normally separate Confirmed facts, Analysis / inference, and Recommendations. Facts must come only from tool results; explain Domain semantics separately; label recommendations as AI recommendations. Simple read answers need not use all three headings, but must still distinguish facts from judgment.`;
 
 const UPSTREAM_FULL_INSTRUCTIONS = `OmniFocus MCP server for macOS task management.
 

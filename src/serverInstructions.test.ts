@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import { getServerInstructions } from "./serverInstructions.js";
 
 describe("getServerInstructions", () => {
-  it("routes the personal-readonly profile through only the four Domain tools", () => {
+  it("front-loads the personal-readonly safety boundary and all four tool routes", () => {
     const instructions = getServerInstructions("personal-readonly");
+    const opening = instructions.slice(0, 512);
+
+    expect(opening).toContain("read-only OmniFocus Domain server");
+    expect(opening).toContain("no mutation capability");
+    expect(opening).toContain("smallest sufficient tool set");
+    expect(opening).toContain("Never claim that OmniFocus was modified");
 
     for (const toolName of [
       "get_lean_snapshot",
@@ -11,8 +17,38 @@ describe("getServerInstructions", () => {
       "get_task",
       "get_completed_since",
     ]) {
-      expect(instructions).toContain(toolName);
+      expect(opening).toContain(toolName);
     }
+  });
+
+  it("includes the production Domain, review, truncation, error, and answer rules", () => {
+    const instructions = getServerInstructions("personal-readonly");
+
+    for (const requiredTerm of [
+      "truncated",
+      "direct",
+      "effective",
+      "source",
+      "ambiguous_match",
+      "not_found",
+      "invalid_arguments",
+      "query_failed",
+      "Confirmed facts",
+      "Analysis / inference",
+      "Recommendations",
+    ]) {
+      expect(instructions).toContain(requiredTerm);
+    }
+
+    expect(instructions).toContain("always provide an explicit since");
+    expect(instructions).toContain("also provide until");
+    expect(instructions).toContain("explicit UTC offset or Z");
+    expect(instructions).toContain("successful empty result, not not_found");
+    expect(instructions).toContain("use only context already returned or present in the conversation");
+  });
+
+  it("does not advertise capabilities excluded from personal-readonly", () => {
+    const instructions = getServerInstructions("personal-readonly");
 
     for (const forbiddenGuidance of [
       "add_omnifocus_task",
@@ -24,11 +60,11 @@ describe("getServerInstructions", () => {
       "create_tag",
       "query_omnifocus",
       "dump_database",
+      "omnifocus://",
+      "JXA",
     ]) {
       expect(instructions).not.toContain(forbiddenGuidance);
     }
-
-    expect(instructions).toContain("No mutation capability is exposed");
   });
 
   it("keeps full-profile guidance and requires explicit write authorization", () => {
@@ -42,5 +78,6 @@ describe("getServerInstructions", () => {
     expect(instructions).toContain(
       "Analysis or recommendations do not constitute mutation authorization."
     );
+    expect(instructions).not.toContain("This is a read-only OmniFocus Domain server");
   });
 });
