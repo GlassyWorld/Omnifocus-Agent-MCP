@@ -554,9 +554,21 @@ AI 分析事实
 
 用户始终保持最终控制权。
 
-### Deployment note
+### Deployment profiles
 
-当前 Server 仍包含 upstream mutation tools，因此安全模型需要客户端 Tool allowlist、明确的 Agent instructions 或等价部署限制配合。README 中的“默认只读”描述的是 `v1.0-personalized` 的使用契约，不是对整个 upstream-compatible Server surface 的技术性写入隔离声明。
+ChatGPT Developer App、ChatGPT Web / iPhone 和 Secure MCP Tunnel 部署必须显式设置：
+
+```bash
+OMNIFOCUS_MCP_PROFILE=personal-readonly
+```
+
+该 Profile 在 Server capability registration 层只公开 `get_lean_snapshot`、
+`get_project`、`get_task` 和 `get_completed_since`，不注册 generic read tools、mutation
+tools 或 MCP Resources。因此只读边界不依赖客户端 Tool allowlist。
+
+为保持现有客户端兼容性，环境变量未设置或为空时使用 `upstream-full`；也可以显式设置
+`OMNIFOCUS_MCP_PROFILE=upstream-full`。完整模式继续注册仓库现有的全部 Tool 和
+Resources。任何其他 Profile 值都会在 Server connect 前导致启动失败，并列出允许值。
 
 ---
 
