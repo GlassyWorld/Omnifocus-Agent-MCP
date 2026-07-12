@@ -3,7 +3,7 @@
 ## 1. Overview
 
 本报告审计当前仓库静态架构。审计基准为 `main` 分支提交
-`a22b89489410aadd6aad61b69fbfcb60523f66f6`，并包含本次未提交的 Profile semantic refactor。
+`4850367f7e4e58829fe44c2736b2257d2072cf81`。
 
 当前仓库不是一个纯粹的“OmniFocus 查询 MCP”，而是两代架构并存：
 
@@ -42,7 +42,11 @@ OmniFocus / OmniJS
 ├── assets/
 │   └── omnifocus-mcp-logo.png
 ├── docs/
-│   └── Architecture_Audit.md
+│   ├── README.md
+│   ├── DEVELOPMENT.md
+│   ├── Architecture_Audit.md
+│   └── history/
+│       └── personalization-v1-implementation-and-acceptance.md
 ├── engineer_log/
 │   ├── GET_TASK_ENGINEERING_LOG.md
 │   ├── GET_PROJECT_ENGINEERING_LOG.md
@@ -58,7 +62,6 @@ OmniFocus / OmniJS
 ├── vitest.config.ts
 ├── vitest.integration.config.ts
 ├── README.md
-├── PERSONALIZATION.md
 ├── QUERY_TOOL_REFERENCE.md
 ├── QUERY_TOOL_EXAMPLES.md
 └── LICENSE

@@ -1,7 +1,7 @@
 # Project Status
 
 > 状态日期：2026-07-12
-> 代码基线：`a22b89489410aadd6aad61b69fbfcb60523f66f6` 加当前未提交 Profile refactor
+> 代码基线：`4850367f7e4e58829fe44c2736b2257d2072cf81`
 
 本页只记录当前可由代码、测试、Accepted ADR 或已冻结文档支持的状态，不把后续方向写成已实现能力。
 
@@ -15,11 +15,12 @@
 - `personal-production` server-side curated capability boundary：当前只注册四个 Domain read tools 且不注册 Resources；未设置环境变量时默认使用该 Profile。
 - `upstream-full` 兼容 Profile：保留 16 个 tools、6 个 Resources，其中包括 7 个 mutation tools。
 - 当前 GPT Tool routing、ChatGPT App Instructions 和 Tunnel/LaunchAgent 运维文档。
+- `personal-production` 重构已通过 build、完整 tests、diff check 和 production audit，并以
+  `4850367` 提交推送；实际部署配置仍需人工迁移。
 
 ## 进行中
 
-- `personal-production` 重构已在当前工作树实现并通过 build、完整 tests、diff check 和 production audit；尚未 commit/push，部署配置尚未人工迁移。
-- 当前没有其他由仓库证据表明正在实施的业务代码重构。
+- 当前工作树正在整理 README、开发规范和 v1 历史验收文档，不涉及业务代码重构。
 
 ## 已决定但未实施
 

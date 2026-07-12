@@ -14,7 +14,9 @@
 - AI 是 analysis 和 explanation layer。
 - 用户是最终 decision maker。
 
-Upstream OmniFocus MCP 仍包含 mutation tools，`src/server.ts` 也仍注册这些能力。因此，本 ADR 定义的是个人化 operating boundary，并不声称 upstream-compatible Server 已移除全部写入能力。
+Upstream OmniFocus MCP 仍包含 mutation tools，并在显式选择 `upstream-full` 时由
+`src/serverRegistration.ts` 注册。因此，本 ADR 定义的是个人化 operating boundary，并不
+声称 upstream-compatible Server 已移除全部写入能力。
 
 ## 决策
 
@@ -57,7 +59,9 @@ OmniFocus facts
 - `get_completed_since`
 - `get_lean_snapshot`
 
-由于仓库为 upstream compatibility 保留 mutation tools，实现本决策的客户端应使用 Tool allowlist、Agent instructions 或适合其环境的等价 deployment boundary。
+由于仓库为 upstream compatibility 保留 mutation tools，默认部署使用 Server-side
+`personal-production` Profile 强制当前四工具边界；Agent instructions 和客户端 allowlist
+只能提供行为指导或附加收窄，不能替代 Server registration。
 
 ## 备选方案
 

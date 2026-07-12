@@ -4,9 +4,9 @@
 
 | 结论 | 当前权威文件 | 历史/支持来源 | 被替代来源或范围 | 代码/测试证据 |
 |---|---|---|---|---|
-| 个性化架构采用 Domain-first | [ADR-001](./architecture/decisions/ADR-001-domain-first-architecture.md) | `README.md`、`PERSONALIZATION.md`、两份 Audit | handler 直接承载业务语义、Raw/query 直接作为个性化契约的方向 | `src/domain/**`、Domain tests、Tool definitions |
+| 个性化架构采用 Domain-first | [ADR-001](./architecture/decisions/ADR-001-domain-first-architecture.md) | `README.md`、[v1 实现与验收历史](./history/personalization-v1-implementation-and-acceptance.md)、两份 Audit | handler 直接承载业务语义、Raw/query 直接作为个性化契约的方向 | `src/domain/**`、Domain tests、Tool definitions |
 | 四个当前 Domain read tools 已完成 | 当前代码与 tests、[PROJECT_STATUS](./PROJECT_STATUS.md) | 四类工程日志、README | 无 | `src/tools/definitions/get{Task,Project,CompletedSince,LeanSnapshot}*`、`src/serverRegistration.test.ts` |
-| Planned/Due 只由 direct owner 生成 visibility | [ADR-002](./architecture/decisions/ADR-002-direct-owner-semantics.md) | Planned/Due 修订日志、PERSONALIZATION | Snapshot 初始实现中的 inherited child fan-out | `src/domain/snapshot/**` 及 tests |
+| Planned/Due 只由 direct owner 生成 visibility | [ADR-002](./architecture/decisions/ADR-002-direct-owner-semantics.md) | Planned/Due 修订日志、[v1 实现与验收历史](./history/personalization-v1-implementation-and-acceptance.md) | Snapshot 初始实现中的 inherited child fan-out | `src/domain/snapshot/**` 及 tests |
 | Defer/Planned/Due 保存 direct/effective/source | Domain types/tests、ADR-002 | Task/Project 工程日志 | 只返回单一 effective 日期而不保留来源的简化表达 | `src/domain/task/dateSemantics.ts`、Project/Snapshot resolvers |
 | Lean Snapshot 与 Full Snapshot 独立 | [ADR-004](./architecture/decisions/ADR-004-lean-snapshot-scope.md) | Snapshot 工程日志、README | `dump_database` 等同稳定 Full Snapshot MCP、立即开发 Full Snapshot 的方向 | Snapshot composer/schema/tests；`dump_database` 独立 upstream tool |
 | section total 在截断前计算，sections 独立截断 | ADR-004、Snapshot tests | Due 修订日志 | 从截断后的 active items 派生 planned/deadline | Snapshot composer/tests |

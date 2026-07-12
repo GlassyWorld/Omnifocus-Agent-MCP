@@ -6,6 +6,7 @@
 
 - [PROJECT_STATUS.md](./PROJECT_STATUS.md)：当前已完成、待设计和明确不在范围的能力。
 - [SOURCE_MAP.md](./SOURCE_MAP.md)：关键结论到代码、测试、ADR 和历史来源的映射。
+- [DEVELOPMENT.md](./DEVELOPMENT.md)：Domain Tool 分层、Raw Contract、测试验收和发布纪律。
 - [reorganization/](./reorganization/)：本次文件盘点、主题矩阵、冲突清单和实际整理方案。
 
 ## 当前架构
@@ -50,9 +51,10 @@
 - [日期语义演进](./history/evolution-summaries/date-semantics-evolution.md)
 - [Profile 与 AI 边界演进](./history/evolution-summaries/profile-and-ai-boundary-evolution.md)
 - [`create_task` 与 Tag 方向](./history/evolution-summaries/create-task-and-tag-direction.md)
+- [v1 个性化实现与验收历史](./history/personalization-v1-implementation-and-acceptance.md)
 
 仓库内没有独立的外部仓库调研记录，也没有原始聊天导出；不要从本导航推断这些材料已被归档。
 
 ## 当前下一步
 
-`personal-production` Profile semantic refactor 已在当前工作树实现；部署迁移仍需人工完成。后续工作入口是单独完成 `create_task` V1 方案设计，不得从本次 Profile 重命名推断写入能力已经存在。
+`personal-production` Profile semantic refactor 已在提交 `4850367` 实现并推送；部署迁移仍需人工完成。后续工作入口是单独完成 `create_task` V1 方案设计，不得从本次 Profile 重命名推断写入能力已经存在。

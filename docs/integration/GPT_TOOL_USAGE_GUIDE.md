@@ -801,10 +801,10 @@ README / Architecture Audit
 - `QUERY_TOOL_REFERENCE.md` 和 `QUERY_TOOL_EXAMPLES.md` 已按当前代码更新，明确
   `deferredUntil` 已实现，并记录 `dueWithin`、`plannedWithin`、`deferredUntil` 只有
   upper bound 等实际限制。
-- `PERSONALIZATION.md` 已与 Accepted ADR-004 对齐：当前低频 Full Snapshot 需求使用
+- v1 实现与验收历史已记录与 Accepted ADR-004 对齐后的边界：当前低频 Full Snapshot 需求使用
   手动/plugin/file 导出 + AI 分析，暂缓 Full Snapshot MCP，直到出现明确且重复的个人
   需求。
-- 当前 README、Architecture Audit、Accepted ADR、Query 文档、`PERSONALIZATION.md` 与
+- 当前 README、Architecture Audit、Accepted ADR、Query 文档、`docs/DEVELOPMENT.md` 与
   本指南在个性化 Domain Tool、direct-owner semantics 和 Full Snapshot 边界上没有已知
   核心冲突。
 

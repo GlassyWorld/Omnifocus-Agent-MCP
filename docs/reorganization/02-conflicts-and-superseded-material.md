@@ -78,7 +78,7 @@ Accepted ADR / 冻结契约
 
 ## 8. 历史验收数量与当前实时状态
 
-事实：工程日志和 PERSONALIZATION 含特定里程碑的测试数量、Raw Oracle 数量和 OmniFocus 数据采样。
+事实：工程日志和已归档的 v1 实现与验收历史含特定里程碑的测试数量、Raw Oracle 数量和 OmniFocus 数据采样。
 
 判断：这些是历史证据，不是 2026-07-12 的实时 OmniFocus 状态。
 

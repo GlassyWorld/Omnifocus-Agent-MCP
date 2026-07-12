@@ -1,6 +1,6 @@
 # Actual Reorganization Plan
 
-> 状态：阶段 A 完成后形成的实际方案
+> 状态：阶段 A 完成后形成，并在 Profile 重构后补充文档职责拆分
 > 基线：`c7bda4efb87f5062ef2ace443c4cac90f150985b`
 > 原则：保留原文、增加导航、建立来源映射，不为了目录整齐而移动稳定路径。
 
@@ -13,7 +13,8 @@
 - 一次性 Codex 指令在仓库内为 0；本轮指令由用户从 Desktop 外部提供。
 - 临时、未命名或来源不明文件为 0。
 - 起始工作树干净，没有未提交改动。
-- 当前最重要的权威来源是当前代码与测试、5 份 Accepted ADR、README/PERSONALIZATION 冻结契约，以及最新 Snapshot 修订日志。
+- 当前最重要的权威来源是当前代码与测试、5 份 Accepted ADR、README、PROJECT_STATUS、
+  `docs/DEVELOPMENT.md`，以及最新 Snapshot 修订日志；v1 完整汇总已转为历史来源。
 
 ### 判断
 
@@ -21,7 +22,8 @@
 
 ### 建议
 
-所有原文原位保留。新增一个薄的导航/状态/来源层，并为最容易误读的四条演进线生成带来源的主题总结。
+当前入口和工程规则从历史汇总中提炼；完整 v1 原文保持内容连续性并移入 history。导航、
+状态、来源层和演进总结继续负责解释权威顺序。
 
 ## 2. 最终目录方案
 
@@ -32,6 +34,7 @@ docs/
 ├── README.md                         # 新增统一导航
 ├── PROJECT_STATUS.md                 # 新增当前事实状态
 ├── SOURCE_MAP.md                     # 新增结论到来源映射
+├── DEVELOPMENT.md                    # 当前 Domain Tool 工程规范
 ├── Architecture_Audit.md             # 原位保留，详细主审计
 ├── OmniFocus-Agent-MCP_Architecture_Audit_v1.md
 ├── OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md
@@ -42,6 +45,7 @@ docs/
 │   ├── personal-production/README.md # 仅状态/范围，不提前设计实现
 │   └── create-task/README.md          # 仅状态/范围，不提前设计实现
 ├── history/
+│   ├── personalization-v1-implementation-and-acceptance.md
 │   └── evolution-summaries/          # 新增演进总结；不冒充原始对话
 ├── integration/                      # App Instructions 与完整 Guide 原位保留
 └── reorganization/                   # 本次盘点、矩阵、冲突和方案
@@ -58,7 +62,7 @@ engineer_log/
 | 处理 | 旧路径 | 新路径或结果 | 理由 |
 |---|---|---|---|
 | KEEP | `README.md` | 原位 | 项目入口和冻结基线，已有历史/外部链接 |
-| KEEP | `PERSONALIZATION.md` | 原位 | 大型冻结设计与验收汇总，拆分会损害历史上下文 |
+| MOVE + ARCHIVE | `PERSONALIZATION.md` | `docs/history/personalization-v1-implementation-and-acceptance.md` | 保留完整历史上下文，但不再与 README 竞争当前权威；当前工程规则提炼至 `docs/DEVELOPMENT.md` |
 | KEEP | `QUERY_TOOL_REFERENCE.md` | 原位 | upstream generic read 的稳定参考路径 |
 | KEEP | `QUERY_TOOL_EXAMPLES.md` | 原位 | 与 Reference 配套 |
 | KEEP | `docs/Architecture_Audit.md` | 原位 | 当前详细架构审计主入口 |
@@ -83,11 +87,11 @@ engineer_log/
 | SYNTHESIZE | ADR-005、Profile 代码、集成/运维文档 | `docs/history/evolution-summaries/profile-and-ai-boundary-evolution.md` | 区分行为指导与能力边界 |
 | SYNTHESIZE | registration、ADR-005、本轮后续方向 | `docs/history/evolution-summaries/create-task-and-tag-direction.md` | 记录现状和待设计问题，不虚构历史对话 |
 
-本轮不执行 MOVE、RENAME 或 ARCHIVE。
+阶段 A 未执行 MOVE、RENAME 或 ARCHIVE；Profile 重构后的文档职责复审授权了上述单文件归档。
 
 ## 4. 内容保真策略
 
-- 20 份原文全部保留，不改写正文和历史验收事实。
+- v1 原文完整归档，不删除历史验收事实；只增加文档角色说明并修正已明确迁移的 Profile 事实。
 - 综合文档只做摘要，并在每节列出仓库相对路径来源。
 - 代码事实、分析判断和后续建议使用明确小节或句首标签分开。
 - 被取代的内容不从原日志删除；在索引、冲突清单和演进总结中标注具体被取代范围。
@@ -103,15 +107,16 @@ engineer_log/
 5. 校验所有来源路径和 Markdown 相对链接。
 6. 搜索 `engineer_log/`、`personal-readonly`、`create_task`/`create-task` 一致性。
 7. 执行 `git status --short`、`git diff --stat`、`git diff --name-status`、`git diff --check`。
+8. Profile 重构后新增 `docs/DEVELOPMENT.md`，归档 v1 汇总，并更新全部内部引用。
 
-因为没有 MOVE/RENAME，执行顺序中“移动原文”和“更新移动链接”不适用。
+阶段 A 没有 MOVE/RENAME；后续归档必须同时完成链接检查，不能留下根目录旧路径引用。
 
 ## 6. 风险与停止条件
 
 | 风险 | 当前判断 | 处理 |
 |---|---|---|
-| 文件被代码或人工流程硬编码引用 | 多处 Markdown 已引用现有路径；外部引用无法穷尽 | 不移动、不重命名 |
-| 同一文件兼具多个用途 | README、PERSONALIZATION、App Instructions 均存在 | 原位保留，用来源映射解释角色 |
+| 文件被代码或人工流程硬编码引用 | 代码无引用；Markdown 引用可穷尽，外部引用无法穷尽 | 更新全部仓库引用，并让 Git 历史保留旧路径 |
+| 同一文件兼具多个用途 | 原 `PERSONALIZATION.md` 同时包含当前规则与历史验收 | 当前规则提炼至 DEVELOPMENT，完整原文归档并标记非当前权威 |
 | 无法判断两份 Audit 谁应删除 | 两者都在当前提交历史中且粒度不同 | 两者保留，指定主入口/精简快照 |
 | 未导出云端对话缺失 | 已确认本地无原始导出 | 最终报告明确范围限制 |
 | Profile/create_task 未来方向被误写成当前事实 | 当前仓库无实现/设计 | 状态页单列“待设计”，本轮不实施 |

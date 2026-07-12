@@ -470,9 +470,13 @@ overdue -> dueSoon -> planned -> flagged
 
 ### Upstream compatibility surface
 
-仓库仍保留 upstream `v1.9.2` 的通用查询、Resource、Perspective、Tag 和 mutation tools，`src/server.ts` 也仍注册这些能力。它们不是 `v1.0-personalized` Domain Contract 的组成部分。
+仓库仍保留 upstream `v1.9.2` 的通用查询、Resource、Perspective、Tag 和 mutation tools。
+它们只在显式选择 `upstream-full` 时由 `src/serverRegistration.ts` 注册，不属于
+`v1.0-personalized` Domain Contract，也不进入默认 `personal-production` surface。
 
-因此，“默认只读”是当前个人化使用模型和客户端暴露策略，不应被误解为 Server 已从代码层移除全部写入能力。用于个人化分析的 MCP client 应只暴露所需的 read tools。
+因此，仓库保留写入实现不等于默认实例可写；当前边界由 Server-side Profile registration
+强制，而不是客户端 allowlist。`personal-production` 当前只公开四个 Domain read tools且无
+Resources，`upstream-full` 只能显式启用。
 
 ---
 
@@ -594,6 +598,10 @@ engineer_log/GET_LEAN_SNAPSHOT_DUE_ATTENTION_GRANULARITY_ENGINEERING_LOG.md
 ```
 
 后续维护者和 AI Agent 应优先以类型定义、Domain tests 和工程日志中的冻结规则判断当前行为，不应从通用 Tool 文案推断 Domain semantics。
+
+- [项目文档导航](./docs/README.md)
+- [Domain Tool 开发规范](./docs/DEVELOPMENT.md)
+- [v1 个性化实现与验收历史](./docs/history/personalization-v1-implementation-and-acceptance.md)
 
 ## License
 

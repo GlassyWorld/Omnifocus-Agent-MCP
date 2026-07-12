@@ -37,7 +37,7 @@
 ## 来源文件
 
 - `README.md`
-- `PERSONALIZATION.md`
+- `docs/history/personalization-v1-implementation-and-acceptance.md`
 - `docs/architecture/decisions/ADR-001-domain-first-architecture.md`
 - `docs/architecture/decisions/ADR-003-task-action-boundary.md`
 - `docs/architecture/decisions/ADR-004-lean-snapshot-scope.md`

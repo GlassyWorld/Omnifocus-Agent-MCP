@@ -1,4 +1,9 @@
-# OmniFocus MCP 个性化改造
+# OmniFocus MCP v1 个性化实现与验收记录
+
+> 文档角色：历史工程汇总，不是当前架构或部署事实的权威入口。
+> 当前状态请从 [`docs/README.md`](../README.md)、[`PROJECT_STATUS.md`](../PROJECT_STATUS.md)、
+> Accepted ADR 和当前代码/测试进入。本文保留 v1 实施顺序、Raw Contract、测试方法与
+> 真实数据库验收快照；其中数量、工具顺序和阶段性安全描述只代表对应里程碑。
 
 ## 1. 项目目的
 

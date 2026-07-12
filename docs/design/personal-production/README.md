@@ -5,7 +5,7 @@
 - 当前代码只支持 `personal-production` 和 `upstream-full`；旧 `personal-readonly` 值无 alias。
 - 未设置或空的 `OMNIFOCUS_MCP_PROFILE` 默认解析为 `personal-production`，`upstream-full` 只能显式启用。
 - `personal-production` 当前精确注册 `get_task`、`get_project`、`get_completed_since`、`get_lean_snapshot`，不注册 Resources。
-- 当前工作树未增加任何写入 Tool；LaunchAgent 和 ChatGPT App 的实际部署迁移需要人工执行。
+- 提交 `4850367` 未增加任何写入 Tool；LaunchAgent 和 ChatGPT App 的实际部署迁移需要人工执行。
 
 ## 当前判断
 

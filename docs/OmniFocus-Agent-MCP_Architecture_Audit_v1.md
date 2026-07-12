@@ -5,7 +5,7 @@
 | 项目 | 基线 |
 |---|---|
 | Repository | `GlassyWorld/Omnifocus-Agent-MCP` |
-| Code baseline | `a22b89489410aadd6aad61b69fbfcb60523f66f6`（`main`）加当前未提交 Profile refactor |
+| Code baseline | `4850367f7e4e58829fe44c2736b2257d2072cf81`（`main`） |
 | Package version | upstream-compatible `1.9.2` |
 | Architecture label | `v1.0-personalized` |
 
