@@ -16,10 +16,20 @@
 | 项目 | 审计基线 |
 |---|---|
 | Repository | `GlassyWorld/Omnifocus-Agent-MCP`（`https://github.com/GlassyWorld/Omnifocus-Agent-MCP`） |
-| Code baseline | `9a01036d0c8cf8570d98d50e8456612a5e0d2df7`（`main`） |
+| Code baseline | `789a0a51ef649c5c25d808109d87ab3a523a40dc`（`main`） |
 | Architecture label | `v1.0-personalized` |
 
 本指南中的 Tool surface、Domain Contract 和语义规则均以该 code baseline 为验证对象。Architecture label 是个人化架构版本标识，不替代 `package.json` 中的 upstream package version `1.9.2`。
+
+---
+
+## ChatGPT App Production Instructions
+
+可直接粘贴到 ChatGPT Developer App 的生产精简 Instructions 位于
+[`CHATGPT_APP_INSTRUCTIONS.md`](./CHATGPT_APP_INSTRUCTIONS.md)。本 Guide 是完整规范；App
+Instructions 是面向 `personal-readonly` Profile 的压缩执行版本。两者出现语义冲突时，
+按真实代码与测试、Accepted ADR、以及本 Guide 当前 Domain Contract 的顺序核对，不得由
+精简版本自行扩展能力或改写语义。
 
 ---
 
