@@ -1,9 +1,9 @@
 export type ServerProfile =
-  | "personal-readonly"
+  | "personal-production"
   | "upstream-full";
 
 export const SERVER_PROFILES: readonly ServerProfile[] = [
-  "personal-readonly",
+  "personal-production",
   "upstream-full",
 ];
 
@@ -11,10 +11,10 @@ export function resolveServerProfile(value: string | undefined): ServerProfile {
   const normalized = value?.trim();
 
   if (!normalized) {
-    return "upstream-full";
+    return "personal-production";
   }
 
-  if (normalized === "personal-readonly" || normalized === "upstream-full") {
+  if (normalized === "personal-production" || normalized === "upstream-full") {
     return normalized;
   }
 

@@ -5,7 +5,7 @@
 | 项目 | 基线 |
 |---|---|
 | Repository | `GlassyWorld/Omnifocus-Agent-MCP` |
-| Code baseline | `789a0a51ef649c5c25d808109d87ab3a523a40dc`（`main`） |
+| Code baseline | `a22b89489410aadd6aad61b69fbfcb60523f66f6`（`main`）加当前未提交 Profile refactor |
 | Package version | upstream-compatible `1.9.2` |
 | Architecture label | `v1.0-personalized` |
 
@@ -13,7 +13,7 @@
 
 - Repository 与 Server registration 架构。
 - Task、Project、Completion、Snapshot Domain。
-- 四个 personal-readonly Domain Tool。
+- `personal-production` 当前注册的四个 Domain read tools。
 - Planned / Due direct-owner semantics。
 - Lean Snapshot 与 Full Snapshot 的边界。
 - AI 分析与 OmniFocus mutation 的边界。
@@ -61,10 +61,10 @@ OmniFocus Raw Data
 
 当前存在两个 Server Profile：
 
-- `personal-readonly`：只注册 `get_task`、`get_project`、`get_completed_since`、`get_lean_snapshot`，不注册 Resources。
+- `personal-production`：当前只注册 `get_task`、`get_project`、`get_completed_since`、`get_lean_snapshot`，不注册 Resources。
 - `upstream-full`：注册仓库现有 16 个 Tool 和 6 类 Resources，包括 generic read 与 mutation 能力。
 
-`OMNIFOCUS_MCP_PROFILE` 未设置或为空时默认进入 `upstream-full`。因此，个人化只读部署必须显式选择 `personal-readonly`；App Instructions 负责行为引导，但真正的 capability boundary 位于 Server registration。
+`OMNIFOCUS_MCP_PROFILE` 未设置或为空时默认进入 `personal-production`，`upstream-full` 只能显式启用。App Instructions 负责行为引导，但真正的 capability boundary 位于 Server registration。旧值 `personal-readonly` 已移除且无 alias。
 
 ---
 
@@ -224,7 +224,7 @@ Flagged 不使用上述 direct-only gate：当前 Attention classifier 使用 `e
 
 Adapter、Domain Contract、Primitive 或 bridge execution failure 通常映射为 `query_failed`，不能解释为“没有数据”。当前 `ambiguous_match` 只返回通用错误，不返回候选对象列表。
 
-Generic read、Resources 和 mutation tools 仍保留在 `upstream-full`，但不会在 `personal-readonly` 中被注册或发现。不能据此声称整个代码仓库已经移除写入实现。
+Generic read、Resources 和 mutation tools 仍保留在 `upstream-full`，但不会在当前 `personal-production` 中被注册或发现。不能据此声称整个代码仓库已经移除写入实现。
 
 ---
 
@@ -290,15 +290,15 @@ OmniFocus 手动 / plugin / file 导出
 - direct/effective/source 同时保留事实与来源。
 - direct-owner Planned/Due rule 消除 inherited Attention fan-out。
 - Lean Snapshot 将全局 current-state 与详情、历史完成和 AI interpretation 分离。
-- `personal-readonly` 在 Server registration 层形成可测试的只读 capability surface。
+- `personal-production` 在 Server registration 层形成可测试的精选 capability surface，当前注册集合只读。
 - facts、Domain semantics、AI inference、recommendation 与用户决策保持分层。
 
 ---
 
 ## 10. 当前架构风险
 
-- Profile 默认值是 `upstream-full`；部署遗漏环境变量会暴露完整兼容 surface。
-- `upstream-full` 与 `personal-readonly` 共用同一 Tool registry，新增 Tool 时必须维护精确注册边界和集合测试。
+- 已部署 LaunchAgent 若仍使用旧 `personal-readonly` 值会 fail fast，需要人工迁移。
+- `upstream-full` 与 `personal-production` 共用同一 Tool registry，新增 Tool 时必须维护显式 profiles allowlist 和精确集合测试。
 - Project/root join、Due consistency 和 Snapshot composer invariant 较严格；Raw contract drift 会使整次 Domain query 失败。
 - Snapshot 每个 section 独立截断；调用方若忽略 `total`、`returned`、`truncated`，可能把部分 items 当作完整集合。
 - Task、Project 和 Snapshot Adapter 存在相似字段校验，未来 Raw field 变化需要同步维护多个 contract。
@@ -312,7 +312,7 @@ OmniFocus 手动 / plugin / file 导出
 当前已经实现：
 
 - Task、Project、Completion、Lean Snapshot Domain。
-- 四个 personal-readonly Domain Tool。
+- `personal-production` 当前注册的四个 Domain read tools。
 - Planned/Due direct-owner semantics。
 - Profile-specific Tool/Resource registration。
 - Profile-specific Server Instructions。
@@ -323,7 +323,7 @@ OmniFocus 手动 / plugin / file 导出
 - Owner Domain/entity。
 - Full Snapshot MCP。
 - Domain-level health、risk、priority 或 recommendation。
-- AI 自动决策或 personal-readonly 写入能力。
+- AI 自动决策或 `personal-production` 写入能力。
 
 合理的近期方向是保持现有 Contract 稳定，根据真实使用反馈评估 Review workflow 和分析表达；不应仅为概念完整性增加 Tool、Domain 或 Snapshot 字段。
 
@@ -340,7 +340,7 @@ flowchart TD
     MC["Mapper / Composer<br/>View 与 Lean Snapshot"]
     TL["MCP Tool Definitions<br/>参数与错误契约"]
     RG{"Server Profile Registration<br/>能力注册边界"}
-    RO["personal-readonly<br/>4 个 Domain read tools<br/>无 Resources"]
+    RO["personal-production<br/>当前 4 个 Domain read tools<br/>无 Resources"]
     UF["upstream-full<br/>完整兼容 Tool 与 Resources"]
     AI["AI Analysis<br/>事实、推断与建议分离"]
     US["User Decision<br/>用户保留最终控制权"]
@@ -354,7 +354,7 @@ flowchart TD
 
 ## 13. 审查结论
 
-当前仓库已经形成可测试的个人化 Domain Semantic Layer，并通过 `personal-readonly` Profile 将四个 Domain read tools 作为独立 Server capability surface 暴露。其核心不是抽象的 Owner entity，而是稳定的 Task/Project facts、Completion event、Lean Snapshot read model，以及基于 provenance 的 direct-owner signal rule。
+当前仓库已经形成可测试的个人化 Domain Semantic Layer，并通过 `personal-production` Profile 将当前四个 Domain read tools 作为独立 Server capability surface 暴露。其核心不是抽象的 Owner entity，而是稳定的 Task/Project facts、Completion event、Lean Snapshot read model，以及基于 provenance 的 direct-owner signal rule。
 
 当前最重要的架构边界是：
 

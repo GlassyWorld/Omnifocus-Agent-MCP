@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前不存在 `create_task` Tool 或 V1 设计。`upstream-full` 有 `add_omnifocus_task`、`list_tags` 和 `create_tag`；它们不在 `personal-readonly` 注册集合中。未来 `create_task` 与既有 Tag 选择只被列为待设计方向，尚未实施。
+当前不存在 `create_task` Tool 或 V1 设计。`upstream-full` 有 `add_omnifocus_task`、`list_tags` 和 `create_tag`；它们不在 `personal-production` 当前注册集合中。未来 `create_task` 与既有 Tag 选择只被列为待设计方向，尚未实施。
 
 ## 演进过程
 
@@ -30,7 +30,7 @@
 
 - exact schema、Project/Inbox 放置、日期时区和既有 Tag 解析。
 - 查重、幂等、preview/confirm、审计、错误恢复。
-- `personal-production` 中精确注册哪些能力及部署迁移方式。
+- `personal-production` 未来受控写入的精确能力、授权与部署方式。
 - 是否允许创建新 Tag；当前方向只提到既有 Tag 选择，不应擅自扩展。
 
 ## 来源文件

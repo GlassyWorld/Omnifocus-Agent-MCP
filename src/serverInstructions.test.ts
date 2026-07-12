@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { getServerInstructions } from "./serverInstructions.js";
 
 describe("getServerInstructions", () => {
-  it("front-loads the personal-readonly safety boundary and all four tool routes", () => {
-    const instructions = getServerInstructions("personal-readonly");
-    const opening = instructions.slice(0, 512);
+  it("front-loads the personal-production capability boundary and all four tool routes", () => {
+    const instructions = getServerInstructions("personal-production");
+    const opening = instructions.slice(0, 768);
 
-    expect(opening).toContain("read-only OmniFocus Domain server");
-    expect(opening).toContain("no mutation capability");
+    expect(opening).toContain("curated personal production profile");
+    expect(opening).toContain("currently registered tool set is read-only");
+    expect(opening).toContain("no mutation capability is currently registered");
+    expect(opening).toContain("server-side tool registration");
     expect(opening).toContain("smallest sufficient tool set");
     expect(opening).toContain("Never claim that OmniFocus was modified");
 
@@ -22,7 +24,7 @@ describe("getServerInstructions", () => {
   });
 
   it("includes the production Domain, review, truncation, error, and answer rules", () => {
-    const instructions = getServerInstructions("personal-readonly");
+    const instructions = getServerInstructions("personal-production");
 
     for (const requiredTerm of [
       "truncated",
@@ -47,8 +49,8 @@ describe("getServerInstructions", () => {
     expect(instructions).toContain("use only context already returned or present in the conversation");
   });
 
-  it("does not advertise capabilities excluded from personal-readonly", () => {
-    const instructions = getServerInstructions("personal-readonly");
+  it("does not advertise capabilities excluded from personal-production", () => {
+    const instructions = getServerInstructions("personal-production");
 
     for (const forbiddenGuidance of [
       "add_omnifocus_task",
@@ -65,6 +67,8 @@ describe("getServerInstructions", () => {
     ]) {
       expect(instructions).not.toContain(forbiddenGuidance);
     }
+
+    expect(instructions).not.toContain("personal-readonly");
   });
 
   it("keeps full-profile guidance and requires explicit write authorization", () => {

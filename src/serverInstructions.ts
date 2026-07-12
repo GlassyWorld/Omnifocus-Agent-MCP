@@ -1,8 +1,8 @@
 import { ServerProfile } from "./config/serverProfile.js";
 
-const PERSONAL_READONLY_INSTRUCTIONS = `This is a read-only OmniFocus Domain server. Reply in the user's current language. Read and analyze only; no mutation capability is exposed. Never claim that OmniFocus was modified. Use the smallest sufficient tool set. Tool routing: get_lean_snapshot for current whole-system state; get_project for one exact Project; get_task for one exact Action, Action Group, or Project Root; get_completed_since for completion history in an explicit time range.
+const PERSONAL_PRODUCTION_INSTRUCTIONS = `This is the curated personal production profile. The currently registered tool set is read-only. Capability boundaries are determined by server-side tool registration, not by model instructions. Reply in the user's current language. Read and analyze only; no mutation capability is currently registered. Never claim that OmniFocus was modified. Use the smallest sufficient tool set. Tool routing: get_lean_snapshot for current whole-system state; get_project for one exact Project; get_task for one exact Action, Action Group, or Project Root; get_completed_since for completion history in an explicit time range.
 
-You cannot create, edit, move, complete, or delete projects, tasks, or tags. If the user requests a write, state that this profile has no write capability.
+This running instance cannot create, edit, move, complete, or delete projects, tasks, or tags. If the user requests a write, state that no registered tool currently provides write capability.
 
 Do not use a global snapshot for a single-object question or infer completion history from current-state tools. Stop when one result is sufficient. Drill down selectively only when required information is missing. Do not batch-expand Projects or Tasks or call all four tools for completeness.
 
@@ -43,7 +43,7 @@ QUERY FILTER TIPS:
 - Combine filters with AND logic; within arrays, OR logic applies`;
 
 export function getServerInstructions(profile: ServerProfile): string {
-  return profile === "personal-readonly"
-    ? PERSONAL_READONLY_INSTRUCTIONS
+  return profile === "personal-production"
+    ? PERSONAL_PRODUCTION_INSTRUCTIONS
     : UPSTREAM_FULL_INSTRUCTIONS;
 }

@@ -19,7 +19,7 @@ OmniFocus 成为执行状态的事实来源。
 
 ## 2. 权限边界
 
-默认只读。
+当前默认能力集合只读。
 
 分析结果不得自动触发写入。只有当用户明确提出具体创建、编辑或其他修改请求时，才可
 将其识别为新的 request-scoped mutation request，并进入独立的授权、预览和确认流程。
@@ -27,12 +27,13 @@ OmniFocus 成为执行状态的事实来源。
 当前个性化业务 Tools `get_task`、`get_project`、`get_completed_since` 和
 `get_lean_snapshot` 都是只读 Tool。Server 现提供两个 capability Profile：
 
-- `OMNIFOCUS_MCP_PROFILE=personal-readonly` 在注册层只公开这四个 Domain read tools，
+- `OMNIFOCUS_MCP_PROFILE=personal-production` 在注册层当前只公开这四个 Domain read tools，
   不注册 generic read tools、mutation tools 或 MCP Resources。
 - `OMNIFOCUS_MCP_PROFILE=upstream-full` 保留全部 upstream-compatible Tool 和 Resources；
-  环境变量未设置或为空时也使用该模式，以保持 backward compatibility。
+  只能通过环境变量显式启用。
 
-正式个人化 ChatGPT / Tunnel 部署必须显式选择 `personal-readonly`。非法 Profile 会在
+环境变量未设置或为空时安全默认进入 `personal-production`。该名称表达长期精选生产能力
+集合，不承诺永久只读；任何未来写入都必须通过专门受控 Tool 显式加入。非法 Profile 会在
 connect 前启动失败，不会静默回退。完整模式中的 mutation 仍只允许在用户明确提出具体
 写入操作时使用；分析或建议不构成写入授权。
 
@@ -911,8 +912,9 @@ get_lean_snapshot
 - Action 当前属于 Task Domain 的 `TaskKind`，不计划仅为别名增加 `ActionView`、
   `get_action` 或 `get_work_actions`。只有 Action 获得独立 lifecycle、health/execution
   state 或不可由 `TaskView` 表达的分析价值时才复审。
-- Server-side read-only Tool Surface 已通过 `personal-readonly` Profile 实现；正式个人化
-  部署必须显式设置该 Profile。未设置环境变量继续进入 `upstream-full` 兼容模式。
+- Server-side curated Tool Surface 已通过 `personal-production` Profile 实现；当前集合只含
+  四个 Domain read tools 且无 Resources。未设置环境变量默认进入该 Profile，
+  `upstream-full` 只能显式启用。
 - 显式 mutation gateway 只有在定义 user authorization、preview/confirmation、有限
   mutation set、auditability、failure/rollback 和 duplicate protection 后才可复审。
 

@@ -3,7 +3,7 @@
 ## 1. Paste-ready Instructions
 
 ```text
-You are connected to a read-only OmniFocus App. Reply in the user's current language. You may only read and analyze OmniFocus data. You cannot create, edit, move, complete, or delete projects, tasks, or tags. Never claim a change occurred. If the user requests a write, state that this App has no write capability.
+You are connected to the curated personal production OmniFocus App. The currently registered tool set is read-only, and capability boundaries are determined by server-side tool registration. Reply in the user's current language. This running instance can only read and analyze OmniFocus data; it cannot create, edit, move, complete, or delete projects, tasks, or tags. Never claim a change occurred. If the user requests a write, state that no registered tool currently provides write capability.
 
 Use the smallest sufficient tool set:
 - For current whole-system state, call get_lean_snapshot first.
@@ -27,12 +27,12 @@ For analytical answers, normally separate Confirmed facts, Analysis / inference,
 ## 2. Design Notes
 
 当前 ChatGPT Developer App 没有独立的 App Instructions 输入框。因此，本文件的
-`Paste-ready Instructions` 同时是 `personal-readonly` MCP Server Instructions 的规范内容
+`Paste-ready Instructions` 同时是 `personal-production` MCP Server Instructions 的规范内容
 来源，由 `src/serverInstructions.ts` 通过 MCP initialize response 的 `instructions` 字段
 提供给 ChatGPT。生产版本发布后，需要在 ChatGPT App 中执行 Refresh，才能重新获取更新
 后的 Server Instructions。
 
-真正的能力与安全边界仍由 Server-side `personal-readonly` Profile 的注册表实现，而不是
+真正的能力与安全边界仍由 Server-side `personal-production` Profile 的注册表实现，而不是
 由 Instructions 保证；文档内容不能替代代码、测试或 Profile enforcement。即使客户端忽略
 提示，注册边界仍会阻止未公开调用，反之仅靠文档或提示也不能创建只读边界。该 Profile
 只公开四个 Domain read tools，也不注册 Resources，因此不能沿用完整 Guide 中依赖
@@ -42,8 +42,12 @@ For analytical answers, normally separate Confirmed facts, Analysis / inference,
 
 完整 Guide 同时描述 upstream-compatible surface、长期编排规则、反模式和维护契约，篇幅
 较大且部分能力不适用于当前 App；原样使用会增加无效上下文并可能诱导调用未公开能力。
-本文件只保留 `personal-readonly` 生产运行所需规则，但不替代 Guide、代码、测试或
+本文件只保留 `personal-production` 当前生产运行所需规则，但不替代 Guide、代码、测试或
 Accepted ADR。
+
+`personal-production` 表示长期的精选个人生产能力集合，不表示永久只读。当前版本仍只有
+四个 Domain read tools 且无 Resources；未来写入能力只能通过专门设计并受控注册的 Tool
+加入，本文件不提前定义尚不存在的写入流程。
 
 四个 Domain Tool 现在还通过 MCP `outputSchema` 声明结构化输出契约。成功响应同时提供
 经过运行时验证的 `structuredContent` 和兼容 JSON 文本 `content`；客户端进行机器处理时

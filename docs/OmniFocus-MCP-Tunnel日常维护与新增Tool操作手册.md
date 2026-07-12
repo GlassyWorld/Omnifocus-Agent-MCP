@@ -1,7 +1,7 @@
 # OmniFocus MCP Tunnel 日常维护与新增 Tool 操作手册
 
 > 更新时间：2026-07-12  
-> 适用环境：macOS + `launchd` + OpenAI Secure MCP Tunnel + `personal-readonly` Profile
+> 适用环境：macOS + `launchd` + OpenAI Secure MCP Tunnel + `personal-production` Profile
 
 ---
 
@@ -22,8 +22,12 @@ omnifocus-readonly
 ### MCP Profile
 
 ```text
-OMNIFOCUS_MCP_PROFILE=personal-readonly
+OMNIFOCUS_MCP_PROFILE=personal-production
 ```
+
+旧值 `personal-readonly` 已不再合法。现有部署迁移时必须人工修改 LaunchAgent 环境变量，
+重新 build，并完整执行 bootout/bootstrap、`/readyz`、ChatGPT App Refresh 和四工具集合验收；
+不要只重启子进程，也不要在本仓库修改过程中直接改动实际 LaunchAgent。
 
 ### LaunchAgent
 
@@ -387,9 +391,9 @@ tunnel-client run \
 
 # 4. 新增 Tool 的标准流程
 
-## 4.1 先确认 Tool 是否应该进入 `personal-readonly`
+## 4.1 先确认 Tool 是否应该进入 `personal-production`
 
-进入 `personal-readonly` 的 Tool 必须满足：
+进入 `personal-production` 的 Tool 必须属于明确审计过的精选生产能力。当前标准流程只接受满足以下条件的读取 Tool：
 
 - 只读取 OmniFocus。
 - 不创建、修改、移动、完成或删除任何对象。
@@ -400,7 +404,7 @@ tunnel-client run \
 - 有独立测试。
 - 有清晰的 GPT 路由场景。
 
-以下能力不得直接加入 `personal-readonly`：
+以下能力不得通过当前标准流程直接加入 `personal-production`：
 
 - mutation Tool。
 - 任意脚本执行。
@@ -408,6 +412,9 @@ tunnel-client run \
 - 通用数据库写入接口。
 - 未经约束的 generic query executor。
 - 会改变 OmniFocus 状态的辅助操作。
+
+未来写入 Tool 必须先有独立的授权、preview/confirmation、审计、失败恢复和重复保护设计，
+再通过 Accepted ADR、显式 profiles allowlist 和专项测试加入；不得从 Profile 名称推断写入授权。
 
 ## 4.2 修改代码时应同步完成
 
@@ -419,7 +426,7 @@ Input schema
 Output schema / Domain Contract
 Adapter / Mapper / Composer（如需要）
 Server registration
-personal-readonly 精确 allowlist
+personal-production 精确 profiles allowlist
 Unit tests
 Registration tests
 Tool Guide
@@ -454,7 +461,7 @@ git diff --check
 git status --short
 ```
 
-## 4.4 检查 `personal-readonly` 精确 Tool 集合
+## 4.4 检查 `personal-production` 精确 Tool 集合
 
 不要只检查 Tool 数量。
 
@@ -683,7 +690,7 @@ iPhone 验收
 ```text
 设计审计
 实现与测试
-更新 personal-readonly allowlist
+更新 personal-production profiles allowlist
 更新精确 Tool 集合测试
 更新 Guide
 更新 App Instructions
@@ -810,15 +817,15 @@ ChatGPT App Instructions 只负责：
 - 回答行为。
 - 事实、推断与建议分离。
 
-真正的只读边界来自：
+当前运行实例的能力边界来自：
 
 ```text
-OMNIFOCUS_MCP_PROFILE=personal-readonly
+OMNIFOCUS_MCP_PROFILE=personal-production
 ```
 
 以及 Server 注册层只公开允许的 Tool。
 
-## 7.2 新 Tool 默认不进入 `personal-readonly`
+## 7.2 新 Tool 默认不进入 `personal-production`
 
 新增 Tool 必须经过显式审计和显式注册。
 
@@ -873,7 +880,7 @@ pgrep -fl tunnel-client
 [ ] Handler 与 Domain Contract 完成
 [ ] Schema 和错误语义明确
 [ ] 单元测试通过
-[ ] personal-readonly 精确注册列表更新
+[ ] personal-production 精确注册列表更新
 [ ] 精确 Tool 集合测试通过
 [ ] GPT Tool Usage Guide 更新
 [ ] ChatGPT App Instructions 更新

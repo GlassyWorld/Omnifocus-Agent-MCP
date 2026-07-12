@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-`personal-readonly` 在 Server registration 层只公开四个 Domain read tools且不注册 Resources；`upstream-full` 保留完整兼容 surface。App/Server Instructions 负责路由和行为指导，但真正的 capability boundary 是注册表。AI 可以分析和建议，不能根据分析结果自动写入 OmniFocus。
+`personal-production` 在 Server registration 层当前只公开四个 Domain read tools 且不注册 Resources；`upstream-full` 保留完整兼容 surface 并只能显式启用。App/Server Instructions 负责路由和行为指导，但真正的 capability boundary 是注册表。AI 可以分析和建议，不能根据分析结果自动写入 OmniFocus。
 
 ## 演进过程
 
@@ -13,11 +13,12 @@
 3. `personal-readonly` Profile 把只读原则落实为可测试的 server-side registration boundary。
 4. App Instructions 与 GPT Guide 对齐四工具路由，并明确提示词不替代能力边界。
 5. Tunnel/LaunchAgent 运维手册要求生产部署显式设置 `OMNIFOCUS_MCP_PROFILE=personal-readonly`。
+6. 2026-07-12 将长期 Profile 语义重构为 `personal-production`，改用 profiles allowlist，并将空值默认改为该精选生产 Profile；旧值不保留 alias。
 
 ## 关键转折
 
 - 从客户端“只暴露读工具”的部署建议，演进为 server 精确注册集合。
-- `upstream-full` mutation code 仍保留，以兼容性存在；不能由此推导个人只读 Profile 可写。
+- `upstream-full` mutation code 仍保留，以兼容性存在；不能由此推导当前个人生产 Profile 可写。
 - 新增结构化输出增强机器契约，不改变 AI/写入边界。
 
 ## 已废弃方案
@@ -28,7 +29,7 @@
 
 ## 仍未解决
 
-- `personal-production` 是后续方向，但当前尚无能力集合、授权模型、迁移或回滚设计。
+- `personal-production` 当前只读能力集合和代码迁移已实现；实际 LaunchAgent/App 部署迁移与回滚仍需人工完成。
 - 若允许受控写入，如何在 server 层强制 preview/confirmation、审计和幂等仍待设计。
 
 ## 来源文件

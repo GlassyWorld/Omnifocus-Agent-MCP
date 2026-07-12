@@ -1,21 +1,21 @@
 # personal-production Profile Status
 
-## 当前事实
+## 已实现边界
 
-- 当前代码只支持 `personal-readonly` 和 `upstream-full`。
-- 当前 ChatGPT App、Tunnel 和 LaunchAgent 文档使用 `personal-readonly`。
-- `personal-production` 尚无 Profile 值、注册集合、测试、部署迁移或回滚方案。
+- 当前代码只支持 `personal-production` 和 `upstream-full`；旧 `personal-readonly` 值无 alias。
+- 未设置或空的 `OMNIFOCUS_MCP_PROFILE` 默认解析为 `personal-production`，`upstream-full` 只能显式启用。
+- `personal-production` 当前精确注册 `get_task`、`get_project`、`get_completed_since`、`get_lean_snapshot`，不注册 Resources。
+- 当前工作树未增加任何写入 Tool；LaunchAgent 和 ChatGPT App 的实际部署迁移需要人工执行。
 
 ## 当前判断
 
-`personal-production` 是用户指定的后续重构方向，不是已接受架构或已实现能力。它可能改变 server capability surface 和 ADR-005 的具体落地，因此必须单独设计和验收。
+`personal-production` 是面向个人日常 ChatGPT App 的长期精选生产能力集合。当前阶段的注册集合仍然只读；名称不承诺永久只读，也不代表写入能力已经存在。Server-side profiles allowlist 是能力边界，Instructions 只负责行为引导。
 
-## 后续设计至少需要回答
+## 后续扩展仍需回答
 
-- Profile 是替代、扩展还是并存于 `personal-readonly`？
-- 精确公开哪些 read/mutation tools 和 Resources？
+- 未来是否需要增加受控 mutation Tool，以及它的精确能力范围？
 - 写入授权、preview/confirmation、审计、幂等和失败恢复如何强制？
-- 现有 App/Tunnel/LaunchAgent 如何迁移、验证和回滚？
+- 已部署 App/Tunnel/LaunchAgent 如何验证和回滚？
 - 如何保持 `upstream-full` compatibility surface？
 
-本页不回答这些设计问题，也不授权实现。当前来源见 [PROJECT_STATUS](../../PROJECT_STATUS.md) 和 [SOURCE_MAP](../../SOURCE_MAP.md)。
+本次重构不回答未来写入设计问题，也不授权实现任何 mutation。当前来源见 [PROJECT_STATUS](../../PROJECT_STATUS.md) 和 [SOURCE_MAP](../../SOURCE_MAP.md)。

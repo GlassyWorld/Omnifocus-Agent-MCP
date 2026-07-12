@@ -4,12 +4,12 @@ import { Logger } from "./utils/logger.js";
 import type { ZodRawShape } from "zod";
 import {
   ALL_TOOL_NAMES,
-  PERSONAL_READONLY_TOOL_NAMES,
+  PERSONAL_PRODUCTION_TOOL_NAMES,
   registerResourcesForProfile,
   registerToolsForProfile,
 } from "./serverRegistration.js";
 
-const EXPECTED_READONLY_TOOLS = [
+const EXPECTED_PRODUCTION_TOOLS = [
   "get_lean_snapshot",
   "get_project",
   "get_task",
@@ -73,14 +73,14 @@ function createRegistrationRecorder(): RegistrationRecorder {
 }
 
 describe("profile-specific server registration", () => {
-  it("registers exactly the four Domain read tools and no resources for personal-readonly", () => {
+  it("registers exactly the four Domain read tools and no resources for personal-production", () => {
     const recorder = createRegistrationRecorder();
 
-    registerToolsForProfile(recorder.server, "personal-readonly");
-    registerResourcesForProfile(recorder.server, recorder.logger, "personal-readonly");
+    registerToolsForProfile(recorder.server, "personal-production");
+    registerResourcesForProfile(recorder.server, recorder.logger, "personal-production");
 
-    expect(recorder.toolNames.sort()).toEqual(EXPECTED_READONLY_TOOLS);
-    expect(PERSONAL_READONLY_TOOL_NAMES.slice().sort()).toEqual(EXPECTED_READONLY_TOOLS);
+    expect(recorder.toolNames.sort()).toEqual(EXPECTED_PRODUCTION_TOOLS);
+    expect(PERSONAL_PRODUCTION_TOOL_NAMES.slice().sort()).toEqual(EXPECTED_PRODUCTION_TOOLS);
     expect(recorder.resourceNames).toEqual([]);
 
     const expectedEnvelopeFields: Record<string, string> = {
@@ -100,9 +100,11 @@ describe("profile-specific server registration", () => {
 
   it("registers the complete upstream tool and resource surface for upstream-full", () => {
     const recorder = createRegistrationRecorder();
+    const productionRecorder = createRegistrationRecorder();
 
     registerToolsForProfile(recorder.server, "upstream-full");
     registerResourcesForProfile(recorder.server, recorder.logger, "upstream-full");
+    registerToolsForProfile(productionRecorder.server, "personal-production");
 
     expect(recorder.toolNames.sort()).toEqual(EXPECTED_FULL_TOOLS);
     expect(ALL_TOOL_NAMES.slice().sort()).toEqual(EXPECTED_FULL_TOOLS);
@@ -117,11 +119,14 @@ describe("profile-specific server registration", () => {
     expect(recorder.toolNames).toContain("get_lean_snapshot");
     expect(recorder.toolNames).toContain("add_omnifocus_task");
 
-    for (const toolName of EXPECTED_READONLY_TOOLS) {
-      expect(recorder.toolConfigs.get(toolName)?.outputSchema).toBeDefined();
+    for (const toolName of EXPECTED_PRODUCTION_TOOLS) {
+      const fullOutputSchema = recorder.toolConfigs.get(toolName)?.outputSchema;
+      const productionOutputSchema = productionRecorder.toolConfigs.get(toolName)?.outputSchema;
+      expect(fullOutputSchema).toBeDefined();
+      expect(productionOutputSchema).toBe(fullOutputSchema);
     }
     for (const legacyToolName of EXPECTED_FULL_TOOLS.filter(
-      name => !EXPECTED_READONLY_TOOLS.includes(name),
+      name => !EXPECTED_PRODUCTION_TOOLS.includes(name),
     )) {
       expect(recorder.toolConfigs.has(legacyToolName)).toBe(false);
     }

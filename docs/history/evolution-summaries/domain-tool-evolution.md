@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-项目已经完成四个只读 Domain Tool：`get_task`、`get_project`、`get_completed_since` 和 `get_lean_snapshot`。它们遵循 Raw→Adapter→Domain→Tool 的分层，返回稳定 Domain View，并通过 `personal-readonly` 形成独立 server capability surface。
+项目已经完成四个只读 Domain Tool：`get_task`、`get_project`、`get_completed_since` 和 `get_lean_snapshot`。它们遵循 Raw→Adapter→Domain→Tool 的分层，返回稳定 Domain View，并通过 `personal-production` 当前注册集合形成独立 server capability surface。
 
 ## 演进过程
 
@@ -13,6 +13,7 @@
 3. `get_completed_since` 建立 direct completion event 流，避免从状态或 modification date 推导历史事件。
 4. `get_lean_snapshot` 组合全系统当前状态，随后通过 Planned 和 Due 两轮修订冻结 direct-owner visibility。
 5. 2026-07-12 增加 `personal-readonly` 精确注册边界、Server Instructions 及四工具结构化成功输出契约。
+6. 同日将 Profile 语义重构为 `personal-production`，不改变四个 Tool 的 Domain Contract 或只读性质。
 
 ## 关键转折
 
@@ -29,7 +30,7 @@
 
 ## 仍未解决
 
-- `personal-production` 的 capability surface 尚未设计。
+- `personal-production` 的当前只读 capability surface 已冻结；未来受控写入尚未设计。
 - `create_task` V1 尚未设计。
 - Full Snapshot、独立 Action Domain 仅保留复审条件，没有当前实施承诺。
 

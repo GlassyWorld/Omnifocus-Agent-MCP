@@ -36,9 +36,9 @@ Accepted ADR / 冻结契约
 
 建议：当前不重命名，避免破坏外部链接；在导航中指定详细审计为当前主入口，`_v1` 为精简快照。
 
-## 3. `personal-readonly` 与 `personal-production` 方向
+## 3. `personal-readonly` 到 `personal-production` 的迁移
 
-事实：当前代码只接受 `personal-readonly` 和 `upstream-full`。所有当前生产部署文档均要求显式设置 `personal-readonly`。`personal-production` 只出现在本轮外部工作指令的后续任务描述中。
+历史事实：本轮 Profile refactor 之前，代码只接受 `personal-readonly` 和 `upstream-full`，生产部署文档要求显式设置旧值。当前代码已改为 `personal-production` 和 `upstream-full`，空值安全默认前者，旧值无 alias。
 
 判断：这不是当前文件之间的实现冲突，而是“当前事实”与“尚未设计的未来方向”的时间线差异。
 
@@ -54,7 +54,7 @@ Accepted ADR / 冻结契约
 
 ## 5. Tag 从“不支持”到已有 primitive、未来个人选择能力
 
-事实：当前 `upstream-full` 注册 `list_tags` 和 `create_tag`；`personal-readonly` 都不注册。当前没有个人化 Tag Domain Tool，也没有 `create_task` 的既有 Tag 选择契约。
+事实：当前 `upstream-full` 注册 `list_tags` 和 `create_tag`；`personal-production` 当前都不注册。当前没有个人化 Tag Domain Tool，也没有 `create_task` 的既有 Tag 选择契约。
 
 判断：笼统说“项目不支持 Tag”已过时；说“个人生产 Tag 能力已完成”同样不准确。
 
@@ -62,7 +62,7 @@ Accepted ADR / 冻结契约
 
 ## 6. Server 安全边界与客户端行为指导
 
-事实：早期个性化说明强调默认只读和客户端只暴露读工具；2026-07-12 的实现已通过 `personal-readonly` 注册表和测试形成 server-side capability boundary。App Instructions 仍提供行为路由，但明确不是能力边界。
+事实：早期个性化说明强调默认只读和客户端只暴露读工具；2026-07-12 先通过 `personal-readonly`、随后通过重命名后的 `personal-production` 注册表和测试形成 server-side capability boundary。App Instructions 仍提供行为路由，但明确不是能力边界。
 
 判断：只依赖客户端 allowlist 或提示词的安全模型已被当前实现加强/取代。
 
@@ -86,7 +86,7 @@ Accepted ADR / 冻结契约
 
 ## 9. 文件名与内容不完全匹配
 
-事实：`CHATGPT_APP_INSTRUCTIONS.md` 同时作为 ChatGPT App paste-ready 内容和 `personal-readonly` Server Instructions 的规范来源；`OmniFocus-Agent-MCP_Architecture_Audit_v1.md` 实际是精简架构快照。
+事实：`CHATGPT_APP_INSTRUCTIONS.md` 同时作为 ChatGPT App paste-ready 内容和 `personal-production` Server Instructions 的规范来源；`OmniFocus-Agent-MCP_Architecture_Audit_v1.md` 实际是精简架构快照。
 
 判断：名称不能完整表达复合用途，但当前已有多处引用。
 
