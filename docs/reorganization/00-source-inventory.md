@@ -6,7 +6,8 @@
 >
 > 后续调整：原根目录 `PERSONALIZATION.md` 已在 Profile 重构后迁至
 > `docs/history/personalization-v1-implementation-and-acceptance.md`；当前工程规则提炼至
-> `docs/DEVELOPMENT.md`。下表中的原始计数仍代表本次盘点时点。
+> `docs/DEVELOPMENT.md`。2026-07-13 仓库卫生清理又将 Tunnel 手册从 `docs/` 迁至
+> `tunnel/docs/`；下表中的原始计数仍代表本次盘点时点，路径列反映当前正式位置。
 
 ## 盘点口径
 
@@ -42,7 +43,7 @@
 | `QUERY_TOOL_EXAMPLES.md` | 用户使用文档 | `query_omnifocus` 示例 | 2025-08 起；2026-07-11 校准 | 当前 | 使用示例 | 与 Reference 配套 | 同上；示例不是 Domain Tool 契约 | KEEP | 标题明确“当前用法示例” |
 | `docs/Architecture_Audit.md` | 用户/架构文档 | 当前仓库结构、数据流、Domain、工具、风险、演进 | 2026-07-11；2026-07-12 更新 | 当前 | 最新综合架构审计 | 与 `_v1`、README、v1 历史重叠 | 第 8.10 节“Owner entity”是审计判断，不是已接受独立 Domain | KEEP；设为详细审计权威入口 | 含 16/4 Tool surface、结构化输出和最新 Profile 事实 |
 | `docs/OmniFocus-Agent-MCP_Architecture_Audit_v1.md` | 用户/架构文档 | `v1.0-personalized` 精简审计快照 | 2026-07-12 | 当前快照 | 支持性审计 | 与 `Architecture_Audit.md` 高度重叠 | 文件名 `_v1` 不直观，易被误认为更权威或更旧 | KEEP；在导航中标注“精简快照” | 标题和结论聚焦 v1，未包含详细结构化输出审计 |
-| `docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md` | 用户/运维文档 | Tunnel、LaunchAgent、Profile、Tool 发布流程 | 2026-07-12 | 当前；机器环境细节需部署时复核 | 运维说明 | 与 GPT Guide/Profile 文档重叠 | 已同步 `personal-production`；实际 LaunchAgent 仍需人工迁移 | KEEP；列入 operations 导航 | 开头声明 macOS + launchd + Tunnel + personal-production 基线 |
+| `tunnel/docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md` | 用户/运维文档 | Tunnel、LaunchAgent、Profile、Tool 发布流程 | 2026-07-12 | 当前；机器环境细节需部署时复核 | 运维说明 | 与 GPT Guide/Profile 文档重叠 | 已同步 `personal-production`；实际运行时资产仍在仓库外 | MOVE；集中到可独立分离的根目录 `tunnel/` | 开头声明 macOS + launchd + Tunnel + personal-production 基线 |
 | `docs/architecture/decisions/ADR-001-domain-first-architecture.md` | ADR | Domain-first 分层 | 2026-07-11 | 当前 | Accepted ADR | 与 README、审计重叠 | 无 | KEEP | 状态 Accepted；决策要求 Raw→Adapter→Domain→Tool |
 | `docs/architecture/decisions/ADR-002-direct-owner-semantics.md` | ADR | Planned/Due direct ownership | 2026-07-11 | 当前 | Accepted ADR | 与 Snapshot 两份修订日志重叠 | 取代早期 inherited child fan-out 行为 | KEEP | 状态 Accepted；明确 inherited facts 保留但不重复生成 attention |
 | `docs/architecture/decisions/ADR-003-task-action-boundary.md` | ADR | Action 留在 Task Domain | 2026-07-11 | 当前 | Accepted ADR | 与审计、v1 历史重叠 | 取代立即新增 `ActionView`/`get_action` 的讨论方向 | KEEP | 状态 Accepted；列出未来复审条件 |

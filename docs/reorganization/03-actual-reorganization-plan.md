@@ -3,6 +3,9 @@
 > 状态：阶段 A 完成后形成，并在 Profile 重构后补充文档职责拆分
 > 基线：`c7bda4efb87f5062ef2ace443c4cac90f150985b`
 > 原则：保留原文、增加导航、建立来源映射，不为了目录整齐而移动稳定路径。
+>
+> 后续调整：2026-07-13 经独立仓库卫生审计，Tunnel 手册在保留完整原文与修复全部当前导航后，
+> 从 `docs/` 迁至 `tunnel/docs/`。下文同时保留阶段 A 的历史事实和该后续调整。
 
 ## 1. 当前状态结论
 
@@ -37,7 +40,6 @@ docs/
 ├── DEVELOPMENT.md                    # 当前 Domain Tool 工程规范
 ├── Architecture_Audit.md             # 原位保留，详细主审计
 ├── OmniFocus-Agent-MCP_Architecture_Audit_v1.md
-├── OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md
 ├── architecture/
 │   └── decisions/                    # 5 份 Accepted ADR 原位保留
 ├── design/
@@ -53,6 +55,10 @@ docs/
 engineer_log/
 ├── README.md                         # 新增阅读顺序与 Domain 映射
 └── GET_*_ENGINEERING_LOG.md          # 6 份原文原位保留
+
+tunnel/
+└── docs/
+    └── OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md
 ```
 
 不创建 `research/`、`instructions/`、`history/raw/`、`history/unclassified/` 或拆分的 `engineering/` 树，因为当前没有对应原始材料，创建空目录会暗示不存在的内容。
@@ -67,7 +73,7 @@ engineer_log/
 | KEEP | `QUERY_TOOL_EXAMPLES.md` | 原位 | 与 Reference 配套 |
 | KEEP | `docs/Architecture_Audit.md` | 原位 | 当前详细架构审计主入口 |
 | KEEP | `docs/OmniFocus-Agent-MCP_Architecture_Audit_v1.md` | 原位 | 精简 v1 快照；用导航消除名称歧义 |
-| KEEP | `docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md` | 原位 | 环境操作手册，路径可能被人工流程引用 |
+| MOVE | `docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md` | `tunnel/docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md` | 运维资产已按后续独立分离要求集中到根目录 `tunnel/` |
 | KEEP | `docs/architecture/decisions/ADR-001-domain-first-architecture.md` | 原位 | Accepted ADR |
 | KEEP | `docs/architecture/decisions/ADR-002-direct-owner-semantics.md` | 原位 | Accepted ADR |
 | KEEP | `docs/architecture/decisions/ADR-003-task-action-boundary.md` | 原位 | Accepted ADR |
@@ -88,6 +94,7 @@ engineer_log/
 | SYNTHESIZE | registration、ADR-005、本轮后续方向 | `docs/history/evolution-summaries/create-task-and-tag-direction.md` | 记录现状和待设计问题，不虚构历史对话 |
 
 阶段 A 未执行 MOVE、RENAME 或 ARCHIVE；Profile 重构后的文档职责复审授权了上述单文件归档。
+Tunnel 手册迁移属于 2026-07-13 的后续仓库卫生调整，不应反写成阶段 A 当时已经发生的事实。
 
 ## 4. 内容保真策略
 

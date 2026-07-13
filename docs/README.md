@@ -43,6 +43,7 @@
 - [`query_omnifocus` Reference](../QUERY_TOOL_REFERENCE.md) 与 [Examples](../QUERY_TOOL_EXAMPLES.md)：`upstream-full` generic read 能力。
 - [GPT Tool Usage Guide](./integration/GPT_TOOL_USAGE_GUIDE.md)：完整 Tool routing 规范。
 - [ChatGPT App Instructions](./integration/CHATGPT_APP_INSTRUCTIONS.md)：当前 `personal-production` 的压缩运行时指令。
+- [Tunnel 日常维护与 Tool 发布手册](../tunnel/docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md)：当前唯一正式 Tunnel 运维入口。
 
 ## 历史和演进
 

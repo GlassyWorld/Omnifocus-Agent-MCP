@@ -1,10 +1,12 @@
 # create_task and Tag Direction
 
-> 类型：当前事实与后续方向综合。仓库内没有 `create_task` 历史对话或设计原件，本文件不虚构这些材料。
+> 类型：2026-07-12 实现前方向快照。仓库内当时没有 `create_task` 历史对话或设计原件，
+> 本文件保留该时点的事实和待设计问题，不作为当前状态入口；当前状态见
+> [`PROJECT_STATUS`](../../PROJECT_STATUS.md) 和 [`create_task` V1 状态页](../../design/create-task/README.md)。
 
-## 当前结论
+## 当时结论（2026-07-12）
 
-当前不存在 `create_task` Tool 或 V1 设计。`upstream-full` 有 `add_omnifocus_task`、`list_tags` 和 `create_tag`；它们不在 `personal-production` 当前注册集合中。未来 `create_task` 与既有 Tag 选择只被列为待设计方向，尚未实施。
+当时不存在 `create_task` Tool 或 V1 设计。`upstream-full` 有 `add_omnifocus_task`、`list_tags` 和 `create_tag`；它们不在当时的 `personal-production` 注册集合中。该时点仅把 `create_task` 与既有 Tag 选择列为待设计方向，尚未实施。
 
 ## 演进过程
 
@@ -26,7 +28,7 @@
 - “直接把 `add_omnifocus_task` 重命名为 `create_task` 即完成 V1”：没有设计或验收证据。
 - “本轮应开始实现 create_task”：与本轮范围冲突。
 
-## 仍未解决
+## 当时未解决
 
 - exact schema、Project/Inbox 放置、日期时区和既有 Tag 解析。
 - 查重、幂等、preview/confirm、审计、错误恢复。

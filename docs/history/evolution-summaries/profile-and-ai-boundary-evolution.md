@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-`personal-production` 在 Server registration 层当前只公开四个 Domain read tools 且不注册 Resources；`upstream-full` 保留完整兼容 surface 并只能显式启用。App/Server Instructions 负责路由和行为指导，但真正的 capability boundary 是注册表。AI 可以分析和建议，不能根据分析结果自动写入 OmniFocus。
+`personal-production` 在 Server registration 层当前公开四个 Domain read tools、唯一受控 mutation `create_task`，且不注册 Resources；`upstream-full` 保留完整兼容 surface 并只能显式启用。App/Server Instructions 负责路由和行为指导，但真正的 capability boundary 是注册表。AI 可以分析和建议；只有用户新的、明确的 Inbox 创建请求才能授权调用 `create_task`，分析结果本身不会自动触发写入。
 
 ## 演进过程
 
@@ -27,10 +27,10 @@
 - AI 识别到需求后自动创建 Project/Task。
 - 在 Domain Layer 混入 recommendation 或 mutation。
 
-## 仍未解决
+## 后续状态
 
-- `personal-production` 当前只读能力集合和代码迁移已实现；实际 LaunchAgent/App 部署迁移与回滚仍需人工完成。
-- 若允许受控写入，如何在 server 层强制 preview/confirmation、审计和幂等仍待设计。
+- `personal-production` Profile 迁移与 `create_task` V1 的 Checkpoint 6A/6B/6C/7 已完成；当前精确 surface 为五个 Tool、零 Resources。
+- 任何超出单个 Inbox Task 创建的新 mutation 仍需独立设计、授权和验收，不能从 `create_task` V1 推导。
 
 ## 来源文件
 
@@ -40,4 +40,4 @@
 - `src/serverInstructions.ts` 及 tests
 - `docs/integration/CHATGPT_APP_INSTRUCTIONS.md`
 - `docs/integration/GPT_TOOL_USAGE_GUIDE.md`
-- `docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md`
+- `tunnel/docs/OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md`

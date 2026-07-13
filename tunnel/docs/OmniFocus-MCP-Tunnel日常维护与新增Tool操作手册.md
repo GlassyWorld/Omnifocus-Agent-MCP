@@ -1,6 +1,6 @@
 # OmniFocus MCP Tunnel 日常维护与新增 Tool 操作手册
 
-> 更新时间：2026-07-12  
+> 更新时间：2026-07-13
 > 适用环境：macOS + `launchd` + OpenAI Secure MCP Tunnel + `personal-production` Profile
 
 ---
@@ -25,9 +25,9 @@ omnifocus-readonly
 OMNIFOCUS_MCP_PROFILE=personal-production
 ```
 
-旧值 `personal-readonly` 已不再合法。现有部署迁移时必须人工修改 LaunchAgent 环境变量，
-重新 build，并完整执行 bootout/bootstrap、`/readyz`、ChatGPT App Refresh 和四工具集合验收；
-不要只重启子进程，也不要在本仓库修改过程中直接改动实际 LaunchAgent。
+旧值 `personal-readonly` 已不再合法。当前部署中，有效的 `OMNIFOCUS_MCP_PROFILE` 来自
+Tunnel Profile YAML；主 LaunchAgent plist 单独承载 `OMNIFOCUS_CREATE_TASK_ENABLED`。
+不要混淆这两个配置来源，也不要在普通仓库维护中修改实际 Profile、feature flag 或 Runtime API Key。
 
 ### LaunchAgent
 
@@ -51,14 +51,19 @@ http://127.0.0.1:18080/readyz
 http://127.0.0.1:18080/ui
 ```
 
-### 当前只读 Tool
+### 当前生产 Tool surface
 
 ```text
 get_lean_snapshot
 get_project
 get_task
 get_completed_since
+create_task
 ```
+
+前四个是 Domain read tools；`create_task` 是唯一允许进入 `personal-production` 的 mutation，
+仅支持用户明确授权的单个 Inbox Task 创建。当前 surface 精确为五个 Tool、零 Resources，
+不得从 `create_task` 推断任何其他写能力。
 
 ---
 
@@ -393,7 +398,7 @@ tunnel-client run \
 
 ## 4.1 先确认 Tool 是否应该进入 `personal-production`
 
-进入 `personal-production` 的 Tool 必须属于明确审计过的精选生产能力。当前标准流程只接受满足以下条件的读取 Tool：
+进入 `personal-production` 的 Tool 必须属于明确审计过的精选生产能力。读取 Tool 应满足：
 
 - 只读取 OmniFocus。
 - 不创建、修改、移动、完成或删除任何对象。
@@ -404,17 +409,20 @@ tunnel-client run \
 - 有独立测试。
 - 有清晰的 GPT 路由场景。
 
-以下能力不得通过当前标准流程直接加入 `personal-production`：
+mutation Tool 不得沿用读取 Tool 的普通发布流程。当前唯一例外是已由 ADR-006 和完整生产验收
+限定的 `create_task` V1。任何新增 mutation 都必须先有独立 Accepted ADR，并满足显式授权、
+有限 mutation set、审计、失败处理和幂等保护要求。
 
-- mutation Tool。
+以下能力不得直接加入 `personal-production`：
+
+- 未经独立 ADR 和专项验收的 mutation Tool。
 - 任意脚本执行。
 - 任意 JXA 执行。
 - 通用数据库写入接口。
 - 未经约束的 generic query executor。
 - 会改变 OmniFocus 状态的辅助操作。
 
-未来写入 Tool 必须先有独立的授权、preview/confirmation、审计、失败恢复和重复保护设计，
-再通过 Accepted ADR、显式 profiles allowlist 和专项测试加入；不得从 Profile 名称推断写入授权。
+不得从 Profile 名称或现有 `create_task` 推断新的写入授权。
 
 ## 4.2 修改代码时应同步完成
 
@@ -470,9 +478,9 @@ git status --short
 ```text
 实际 Tool 名称集合
 =
-原有允许列表
+当前精确允许列表
 +
-本次明确新增的只读 Tool
+本次明确批准的新增 Tool
 ```
 
 同时确认没有意外出现：
@@ -487,8 +495,9 @@ remove_item
 batch_add_items
 batch_remove_items
 create_tag
-Resources
 ```
+
+同时确认 Resources 仍未注册，且除 `create_task` 外没有其他 mutation Tool。
 
 除非未来通过新的正式设计决策明确改变边界。
 
@@ -615,7 +624,7 @@ docs/integration/CHATGPT_APP_INSTRUCTIONS.md
 
 确认：
 
-- 没有暴露 mutation Tool。
+- 除已批准的 `create_task` 外没有暴露其他 mutation Tool。
 - 没有暴露 Resources。
 - 没有意外暴露 upstream generic Tool。
 - 分析不会自动触发写入。
@@ -839,12 +848,12 @@ OMNIFOCUS_MCP_PROFILE=personal-production
 
 ## 7.3 不把“分析建议”视为写入授权
 
-即使未来出现写入 Profile：
+当前虽已存在受控 `create_task`：
 
 - 分析完成不等于允许写入。
 - 建议不等于允许写入。
 - 用户必须提出新的、明确的写入请求。
-- 写入应进入独立预览、确认和授权流程。
+- 写入仍必须来自用户新的、明确的创建请求，并遵守该 Tool 的契约和幂等边界。
 
 ## 7.4 日常维护只看三个核心信号
 
@@ -876,7 +885,7 @@ pgrep -fl tunnel-client
 # 9. 新增 Tool 的最简发布清单
 
 ```text
-[ ] Tool 确认属于只读能力
+[ ] Tool 已确认属于读取能力，或已具备独立 Accepted ADR 和专项写入验收
 [ ] Handler 与 Domain Contract 完成
 [ ] Schema 和错误语义明确
 [ ] 单元测试通过
@@ -893,5 +902,5 @@ pgrep -fl tunnel-client
 [ ] 检查 Tool 名称集合
 [ ] Web 端验收
 [ ] iPhone 端验收
-[ ] 确认没有 mutation Tool 或 Resource 暴露
+[ ] 确认除已批准的 `create_task` 外没有其他 mutation Tool，且没有 Resource 暴露
 ```

@@ -1,10 +1,12 @@
 # Domain Tool Evolution
 
-> 类型：主题综合文档。仓库内没有对应的原始聊天导出；本文件综合代码、ADR 和工程日志，不替代原件。
+> 类型：四个 Domain read tools 的主题综合文档。仓库内没有对应的原始聊天导出；本文件综合代码、ADR 和工程日志，不替代原件。
+> 本文的 Profile 结论冻结于 2026-07-12 `create_task` 实施前；当前生产 surface 见
+> [`PROJECT_STATUS`](../../PROJECT_STATUS.md)。
 
-## 当前结论
+## Domain read 基线结论
 
-项目已经完成四个只读 Domain Tool：`get_task`、`get_project`、`get_completed_since` 和 `get_lean_snapshot`。它们遵循 Raw→Adapter→Domain→Tool 的分层，返回稳定 Domain View，并通过 `personal-production` 当前注册集合形成独立 server capability surface。
+项目已经完成四个只读 Domain Tool：`get_task`、`get_project`、`get_completed_since` 和 `get_lean_snapshot`。它们遵循 Raw→Adapter→Domain→Tool 的分层并返回稳定 Domain View；2026-07-12 时它们构成 `personal-production` 的完整 server capability surface。
 
 ## 演进过程
 
@@ -28,10 +30,10 @@
 - 立即增加独立 Action Domain 或 `get_action`。
 - 把 raw `dump_database` 称为稳定 Full Snapshot Domain MCP。
 
-## 仍未解决
+## 当时未解决
 
-- `personal-production` 的当前只读 capability surface 已冻结；未来受控写入尚未设计。
-- `create_task` V1 尚未设计。
+- `personal-production` 的只读 capability surface 当时已冻结；受控写入尚未设计。
+- `create_task` V1 在该快照时点尚未设计。
 - Full Snapshot、独立 Action Domain 仅保留复审条件，没有当前实施承诺。
 
 ## 来源文件

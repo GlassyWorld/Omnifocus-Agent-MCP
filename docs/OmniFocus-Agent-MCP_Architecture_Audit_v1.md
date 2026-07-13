@@ -1,5 +1,8 @@
 # OmniFocus-Agent-MCP Architecture Audit v1
 
+> 历史架构快照：基线为 `4850367`，早于 `create_task` V1。本文中的“当前”均指该基线时点；
+> 当前生产状态以 [`PROJECT_STATUS`](./PROJECT_STATUS.md) 为准。
+
 ## 1. 审查基线与范围
 
 | 项目 | 基线 |

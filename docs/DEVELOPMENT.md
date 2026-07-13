@@ -74,12 +74,12 @@ fresh-build STDIO MCP Domain Tool
 
 ## Profile 与发布纪律
 
-- `personal-production` 当前只注册四个 Domain read tools 且无 Resources；改变集合必须显式
+- `personal-production` 当前注册四个 Domain read tools、`create_task` 且无 Resources；改变集合必须显式
   修改 `profiles` allowlist 和精确集合测试。
 - `upstream-full` 保留兼容 surface，只能显式启用；未经明确任务不删除或改变 upstream Tool
   行为。
-- 新增 mutation 能力必须先满足 ADR-005 的用户授权、preview/confirmation、有限 mutation
-  set、审计、失败/回滚和重复保护门槛。
+- 新增 mutation 能力不能从现有 `create_task` 推导授权；必须先满足 ADR-005/ADR-006 所确立的
+  用户授权、有限 mutation set、审计、失败处理和重复保护门槛。
 - 修改 Profile、Instructions 或 Tool surface 时同步 README、PROJECT_STATUS、SOURCE_MAP、
   集成指南和运维手册。
 - 未经明确任务不修改 Bridge、Transport、Tunnel 或实际 LaunchAgent 配置。
