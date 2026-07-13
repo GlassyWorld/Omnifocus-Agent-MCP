@@ -18,6 +18,7 @@
 - [ADR-003：Task/Action Boundary](./architecture/decisions/ADR-003-task-action-boundary.md)
 - [ADR-004：Lean Snapshot Scope](./architecture/decisions/ADR-004-lean-snapshot-scope.md)
 - [ADR-005：AI/Mutation Boundary](./architecture/decisions/ADR-005-ai-boundary.md)
+- [ADR-006：Controlled create_task V1](./architecture/decisions/ADR-006-controlled-create-task-v1.md)
 
 ## 四个 Domain Tool
 
@@ -34,7 +35,7 @@
 
 - 当前 Profile：`personal-production` 与 `upstream-full`，见 [PROJECT_STATUS](./PROJECT_STATUS.md#当前节点)。
 - [`personal-production` 状态页](./design/personal-production/README.md)：当前精选生产能力与后续扩展边界。
-- [`create_task` V1 状态页](./design/create-task/README.md)：仅待设计，尚未实施。
+- [`create_task` V1 状态页](./design/create-task/README.md)：已完成 Checkpoint 6A/6B/6C/7，当前在 `personal-production` 正式启用。
 - [设计区说明](./design/README.md)：进入设计阶段前必须保持的事实/授权边界。
 
 ## Query、App 与运维
@@ -42,7 +43,6 @@
 - [`query_omnifocus` Reference](../QUERY_TOOL_REFERENCE.md) 与 [Examples](../QUERY_TOOL_EXAMPLES.md)：`upstream-full` generic read 能力。
 - [GPT Tool Usage Guide](./integration/GPT_TOOL_USAGE_GUIDE.md)：完整 Tool routing 规范。
 - [ChatGPT App Instructions](./integration/CHATGPT_APP_INSTRUCTIONS.md)：当前 `personal-production` 的压缩运行时指令。
-- [Tunnel / LaunchAgent 操作手册](./OmniFocus-MCP-Tunnel日常维护与新增Tool操作手册.md)：当前生产运维说明。
 
 ## 历史和演进
 
@@ -57,4 +57,4 @@
 
 ## 当前下一步
 
-`personal-production` Profile semantic refactor 已在提交 `4850367` 实现并推送；部署迁移仍需人工完成。后续工作入口是单独完成 `create_task` V1 方案设计，不得从本次 Profile 重命名推断写入能力已经存在。
+`personal-production` Profile semantic refactor 已在提交 `4850367` 实现并推送；`create_task` V1 基础实现与 corrected Schema 分别记录于 `c71fae4`、`c534027`，正式生产部署已通过完整门禁。写能力仍只限明确授权的单个 Inbox Task，不得从 Profile 名称推断其他 mutation。

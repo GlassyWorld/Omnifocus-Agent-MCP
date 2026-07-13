@@ -18,7 +18,7 @@
 | `query_omnifocus` 是 generic full-profile read tool | registration code、[Query Reference](../QUERY_TOOL_REFERENCE.md) | Examples、GPT Guide | 把它列为 `personal-production` 当前 surface | `src/serverRegistration.ts` 及 tests |
 | 当前只有 `personal-production` 和 `upstream-full` Profiles | profile code/tests | README、Tunnel 手册 | 旧 `personal-readonly` Profile；空值默认 full | `src/config/serverProfile.ts` 及 tests |
 | `personal-production` 当前精确注册四个 Domain read tools且无 Resources | 当前代码/测试、[状态页](./design/personal-production/README.md) | Profile refactor 指令 | 把长期名称误解为当前已有写入能力 | registration allowlist、精确集合和 Resource tests |
-| `create_task` V1 尚未设计/实施 | 当前代码/文档全文检查、[状态页](./design/create-task/README.md) | ADR-005 mutation 复审条件 | 把 `add_omnifocus_task` 等同未来契约 | registry 只有 `add_omnifocus_task`，无 `create_task` |
+| `create_task` V1 已完成 Checkpoint 6A/6B/6C/7 并正式启用 | [ADR-006](./architecture/decisions/ADR-006-controlled-create-task-v1.md)、[状态页](./design/create-task/README.md)、[Checkpoint 7 验收](./design/create-task/CHECKPOINT7_FORMAL_ENABLEMENT_ACCEPTANCE.md) | ADR-005 mutation 复审条件、探针/Canary/Retry 验收记录 | 把 `add_omnifocus_task` 等同新契约、从 `create_task` 推断其他 mutation | `src/domain/taskCreation/**`、`createInboxTask`、safe JXA executor、required UUID wire Schema、feature flag 及 tests；`personal-production` 精确五 Tool、零 Resources、唯一 mutation 为 `create_task` |
 | Tag primitive 已存在但不在个人 Profile | registration code/tests | Architecture Audit、GPT Guide | “仓库完全不支持 Tag” | `list_tags`、`create_tag` definitions/primitives；full-only registry |
 | 工程日志是稳定历史，不应删除 | [engineer_log 索引](../engineer_log/README.md) | README Maintenance Reference、Architecture Audit | 无 | Git 历史保留各里程碑提交 |
 
