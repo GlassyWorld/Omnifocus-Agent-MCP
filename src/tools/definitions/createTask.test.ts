@@ -7,6 +7,7 @@ import {
   CreateTaskCanaryAuditRecord,
   CreateTaskHandlerService,
   handler,
+  inputSchema,
   schema,
   _testExports,
 } from "./createTask.js";
@@ -46,7 +47,10 @@ describe("create_task handler", () => {
       "note",
       "plannedDate",
     ]);
-    expect(schema.safeParse({ name: "Task", destination: { kind: "inbox" } }).success).toBe(true);
+    expect(schema.safeParse({ name: "Task", idempotencyKey: key }).success).toBe(true);
+    expect(schema.safeParse({ name: "Task", idempotencyKey: key, destination: { kind: "inbox" } }).success).toBe(false);
+    expect(inputSchema.safeParse({ name: "Task" }).success).toBe(false);
+    expect(inputSchema.safeParse({ name: "Task", idempotencyKey: key }).success).toBe(true);
   });
 
   it("runs the strict object parser and rejects extra fields before service", async () => {

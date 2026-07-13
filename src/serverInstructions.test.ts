@@ -71,6 +71,9 @@ describe("getServerInstructions", () => {
     expect(instructions).toContain("write-disabled canary mode");
     expect(instructions).toContain("success=true");
     expect(instructions).toContain("do not silently omit it or fall back to Inbox");
+    expect(instructions).toContain("fresh UUID idempotencyKey");
+    expect(instructions).toContain("reuse exactly the same key");
+    expect(instructions).toContain("Do not ask the user to supply");
     expect(instructions).toContain("planning, recommendations, statements, analysis");
   });
 

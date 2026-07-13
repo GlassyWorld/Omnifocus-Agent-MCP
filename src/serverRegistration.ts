@@ -143,7 +143,7 @@ export const TOOL_REGISTRY: readonly ToolRegistration[] = [
   },
   {
     name: "create_task",
-    description: "Create exactly one new OmniFocus task in the Inbox after an explicit user request. This server may be running in a write-disabled canary mode; in that mode the tool validates the request and returns write_disabled without touching OmniFocus. V1 does not support projects, parent tasks, tags, repeats, notifications, batches, or updates. Do not use it for planning, recommendations, statements, or inferred future work.",
+    description: "Create exactly one new OmniFocus task in the Inbox after an explicit user request. Generate a fresh UUID idempotencyKey for each new user-authorized creation intent and reuse that same key if the same Tool call is transparently retried. This server may be running in a write-disabled canary mode; in that mode the tool validates the request and returns write_disabled without touching OmniFocus. V1 does not support projects, parent tasks, tags, repeats, notifications, batches, or updates. Do not use it for planning, recommendations, statements, or inferred future work.",
     tool: createTaskTool,
     profiles: ["personal-production"],
   },

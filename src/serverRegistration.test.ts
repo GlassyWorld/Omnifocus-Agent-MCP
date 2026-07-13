@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Logger } from "./utils/logger.js";
 import type { ZodRawShape, ZodTypeAny } from "zod";
 import {
@@ -76,6 +78,40 @@ function createRegistrationRecorder(): RegistrationRecorder {
 }
 
 describe("profile-specific server registration", () => {
+  it("publishes the complete required create_task JSON Schema over MCP", async () => {
+    const server = new McpServer({ name: "schema-test-server", version: "1.0.0" });
+    const client = new Client({ name: "schema-test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    registerToolsForProfile(server, "personal-production");
+
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      const listed = await client.listTools();
+      const createTask = listed.tools.find(tool => tool.name === "create_task");
+
+      expect(createTask?.inputSchema.type).toBe("object");
+      expect(Object.keys(createTask?.inputSchema.properties ?? {}).sort()).toEqual([
+        "deferDate",
+        "dueDate",
+        "estimatedMinutes",
+        "flagged",
+        "idempotencyKey",
+        "name",
+        "note",
+        "plannedDate",
+      ]);
+      expect(createTask?.inputSchema.required?.slice().sort()).toEqual([
+        "idempotencyKey",
+        "name",
+      ]);
+      expect(createTask?.inputSchema.additionalProperties).toBe(false);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
   it("registers exactly four Domain reads plus the write-disabled-capable create_task and no resources for personal-production", () => {
     const recorder = createRegistrationRecorder();
 
@@ -107,6 +143,11 @@ describe("profile-specific server registration", () => {
       idempotentHint: true,
     });
     const createInputSchema = recorder.toolConfigs.get("create_task")?.inputSchema as ZodTypeAny;
+    expect(createInputSchema.safeParse({ name: "Task" }).success).toBe(false);
+    expect(createInputSchema.safeParse({
+      name: "Task",
+      idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+    }).success).toBe(true);
     expect(createInputSchema.safeParse({ name: "Task", destination: { kind: "inbox" } }).success).toBe(false);
   });
 

@@ -24,6 +24,8 @@ export const createTaskAbsoluteDateTimeSchema = z
     message: "datetime must include Z or an explicit UTC offset",
   });
 
+const createTaskIdempotencyKeySchema = z.string().uuid();
+
 export const createTaskInputShape = {
   name: z.string().trim().min(1).max(500).refine(value => !hasLoneSurrogate(value), {
     message: "name must contain well-formed Unicode",
@@ -36,24 +38,42 @@ export const createTaskInputShape = {
   deferDate: createTaskAbsoluteDateTimeSchema.optional(),
   flagged: z.boolean().optional(),
   estimatedMinutes: z.number().int().positive().max(10_080).optional(),
-  idempotencyKey: z.string().uuid().optional(),
+  idempotencyKey: createTaskIdempotencyKeySchema.optional(),
 } as const;
+
+export const createTaskPublicInputShape = {
+  ...createTaskInputShape,
+  idempotencyKey: createTaskIdempotencyKeySchema,
+} as const;
+
+function validateDateRelationships(
+  value: { deferDate?: string; dueDate?: string },
+  context: z.RefinementCtx,
+): void {
+  if (
+    value.deferDate !== undefined
+    && value.dueDate !== undefined
+    && Date.parse(value.dueDate) < Date.parse(value.deferDate)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["dueDate"],
+      message: "dueDate must not be earlier than deferDate",
+    });
+  }
+}
 
 export const createTaskInputSchema = z.object(createTaskInputShape)
   .strict()
-  .superRefine((value, context) => {
-    if (
-      value.deferDate !== undefined
-      && value.dueDate !== undefined
-      && Date.parse(value.dueDate) < Date.parse(value.deferDate)
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["dueDate"],
-        message: "dueDate must not be earlier than deferDate",
-      });
-    }
-  });
+  .superRefine(validateDateRelationships);
+
+// The current production client has no verified stable MCP request-ID source.
+// Keep the public Tool contract fail-closed by requiring a client/model UUID.
+// The internal schema remains optional so a future, separately accepted stable
+// metadata path can be enabled without changing Ledger semantics.
+export const createTaskPublicInputSchema = z.object(createTaskPublicInputShape)
+  .strict()
+  .superRefine(validateDateRelationships);
 
 export type CreateTaskInput = z.infer<typeof createTaskInputSchema>;
 

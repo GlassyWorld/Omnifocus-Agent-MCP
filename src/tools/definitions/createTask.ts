@@ -8,7 +8,7 @@ import { CreateTaskLedger } from "../../domain/taskCreation/createTaskLedger.js"
 import { CreateTaskService } from "../../domain/taskCreation/createTaskService.js";
 import {
   createTaskInputSchema,
-  createTaskInputShape,
+  createTaskPublicInputShape,
   createTaskOutputSchema,
   createTaskSuccessSchema,
 } from "../../domain/taskCreation/createTaskSchemas.js";
@@ -18,8 +18,11 @@ import { isCreateTaskMutationEnabled } from "../../config/createTaskFeatureFlag.
 import { canonicalizeCreateTaskInput } from "../../domain/taskCreation/createTaskCanonicalizer.js";
 import { hashIdempotencyKey } from "../../domain/taskCreation/createTaskLedger.js";
 
-export const schema = z.object(createTaskInputShape);
-export const inputSchema = createTaskInputSchema;
+// MCP SDK 1.29 serializes refined/effects schemas as an empty JSON Schema.
+// Register a strict ZodObject so clients receive the complete properties and
+// required list; the handler still runs the full relation-aware parser.
+export const schema = z.object(createTaskPublicInputShape).strict();
+export const inputSchema = schema;
 export const outputSchema = createTaskOutputSchema;
 export const annotations = {
   readOnlyHint: false,
