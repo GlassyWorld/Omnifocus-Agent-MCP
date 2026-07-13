@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Logger } from "./utils/logger.js";
-import type { ZodRawShape } from "zod";
+import type { ZodRawShape, ZodTypeAny } from "zod";
 import {
   ALL_TOOL_NAMES,
   PERSONAL_PRODUCTION_TOOL_NAMES,
@@ -10,6 +10,7 @@ import {
 } from "./serverRegistration.js";
 
 const EXPECTED_PRODUCTION_TOOLS = [
+  "create_task",
   "get_lean_snapshot",
   "get_project",
   "get_task",
@@ -35,10 +36,12 @@ const EXPECTED_FULL_TOOLS = [
   "create_tag",
 ].sort();
 
+const EXPECTED_ALL_TOOLS = [...EXPECTED_FULL_TOOLS, "create_task"].sort();
+
 type RegistrationRecorder = {
   toolNames: string[];
   resourceNames: string[];
-  toolConfigs: Map<string, { inputSchema?: ZodRawShape; outputSchema?: ZodRawShape }>;
+  toolConfigs: Map<string, { inputSchema?: ZodRawShape | ZodTypeAny; outputSchema?: ZodRawShape; annotations?: Record<string, unknown> }>;
   server: McpServer;
   logger: Logger;
 };
@@ -48,7 +51,7 @@ function createRegistrationRecorder(): RegistrationRecorder {
   const resourceNames: string[] = [];
   const toolConfigs = new Map<
     string,
-    { inputSchema?: ZodRawShape; outputSchema?: ZodRawShape }
+    { inputSchema?: ZodRawShape | ZodTypeAny; outputSchema?: ZodRawShape; annotations?: Record<string, unknown> }
   >();
   const server = {
     tool(name: string): void {
@@ -56,7 +59,7 @@ function createRegistrationRecorder(): RegistrationRecorder {
     },
     registerTool(
       name: string,
-      config: { inputSchema?: ZodRawShape; outputSchema?: ZodRawShape },
+      config: { inputSchema?: ZodRawShape | ZodTypeAny; outputSchema?: ZodRawShape; annotations?: Record<string, unknown> },
     ): void {
       toolNames.push(name);
       toolConfigs.set(name, config);
@@ -73,7 +76,7 @@ function createRegistrationRecorder(): RegistrationRecorder {
 }
 
 describe("profile-specific server registration", () => {
-  it("registers exactly the four Domain read tools and no resources for personal-production", () => {
+  it("registers exactly four Domain reads plus the write-disabled-capable create_task and no resources for personal-production", () => {
     const recorder = createRegistrationRecorder();
 
     registerToolsForProfile(recorder.server, "personal-production");
@@ -88,6 +91,7 @@ describe("profile-specific server registration", () => {
       get_project: "project",
       get_completed_since: "completed",
       get_lean_snapshot: "snapshot",
+      create_task: "created",
     };
     for (const [toolName, payloadField] of Object.entries(expectedEnvelopeFields)) {
       const outputSchema = recorder.toolConfigs.get(toolName)?.outputSchema;
@@ -96,6 +100,14 @@ describe("profile-specific server registration", () => {
         expect.arrayContaining(["success", payloadField]),
       );
     }
+    expect(recorder.toolConfigs.get("create_task")?.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: false,
+      idempotentHint: true,
+    });
+    const createInputSchema = recorder.toolConfigs.get("create_task")?.inputSchema as ZodTypeAny;
+    expect(createInputSchema.safeParse({ name: "Task", destination: { kind: "inbox" } }).success).toBe(false);
   });
 
   it("registers the complete upstream tool and resource surface for upstream-full", () => {
@@ -107,7 +119,7 @@ describe("profile-specific server registration", () => {
     registerToolsForProfile(productionRecorder.server, "personal-production");
 
     expect(recorder.toolNames.sort()).toEqual(EXPECTED_FULL_TOOLS);
-    expect(ALL_TOOL_NAMES.slice().sort()).toEqual(EXPECTED_FULL_TOOLS);
+    expect(ALL_TOOL_NAMES.slice().sort()).toEqual(EXPECTED_ALL_TOOLS);
     expect(recorder.resourceNames.sort()).toEqual([
       "flagged",
       "inbox",
@@ -118,8 +130,9 @@ describe("profile-specific server registration", () => {
     ]);
     expect(recorder.toolNames).toContain("get_lean_snapshot");
     expect(recorder.toolNames).toContain("add_omnifocus_task");
+    expect(recorder.toolNames).not.toContain("create_task");
 
-    for (const toolName of EXPECTED_PRODUCTION_TOOLS) {
+    for (const toolName of EXPECTED_PRODUCTION_TOOLS.filter(name => name !== "create_task")) {
       const fullOutputSchema = recorder.toolConfigs.get(toolName)?.outputSchema;
       const productionOutputSchema = productionRecorder.toolConfigs.get(toolName)?.outputSchema;
       expect(fullOutputSchema).toBeDefined();

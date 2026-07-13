@@ -2,22 +2,21 @@ import { describe, expect, it } from "vitest";
 import { getServerInstructions } from "./serverInstructions.js";
 
 describe("getServerInstructions", () => {
-  it("front-loads the personal-production capability boundary and all four tool routes", () => {
+  it("front-loads the personal-production capability boundary and all five tool routes", () => {
     const instructions = getServerInstructions("personal-production");
     const opening = instructions.slice(0, 768);
 
     expect(opening).toContain("curated personal production profile");
-    expect(opening).toContain("currently registered tool set is read-only");
-    expect(opening).toContain("no mutation capability is currently registered");
     expect(opening).toContain("server-side tool registration");
     expect(opening).toContain("smallest sufficient tool set");
-    expect(opening).toContain("Never claim that OmniFocus was modified");
+    expect(opening).toContain("Reading and analysis remain the default behavior");
 
     for (const toolName of [
       "get_lean_snapshot",
       "get_project",
       "get_task",
       "get_completed_since",
+      "create_task",
     ]) {
       expect(opening).toContain(toolName);
     }
@@ -69,6 +68,10 @@ describe("getServerInstructions", () => {
     }
 
     expect(instructions).not.toContain("personal-readonly");
+    expect(instructions).toContain("write-disabled canary mode");
+    expect(instructions).toContain("success=true");
+    expect(instructions).toContain("do not silently omit it or fall back to Inbox");
+    expect(instructions).toContain("planning, recommendations, statements, analysis");
   });
 
   it("keeps full-profile guidance and requires explicit write authorization", () => {

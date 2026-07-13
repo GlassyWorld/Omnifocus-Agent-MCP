@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { ZodRawShape } from "zod";
+import type { ZodRawShape, ZodTypeAny } from "zod";
 import type { ServerProfile } from "./config/serverProfile.js";
 import { registerResources } from "./resources/index.js";
 import { Logger } from "./utils/logger.js";
@@ -22,10 +22,18 @@ import * as listPerspectivesTool from "./tools/definitions/listPerspectives.js";
 import * as getPerspectiveViewTool from "./tools/definitions/getPerspectiveView.js";
 import * as listTagsTool from "./tools/definitions/listTags.js";
 import * as createTagTool from "./tools/definitions/createTag.js";
+import * as createTaskTool from "./tools/definitions/createTask.js";
 
 type ToolModule = {
   schema: { shape: ZodRawShape };
+  inputSchema?: ZodTypeAny;
   outputSchema?: ZodRawShape;
+  annotations?: {
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
   handler: unknown;
 };
 
@@ -39,8 +47,9 @@ type RegistryMcpServer = {
     name: string,
     config: {
       description?: string;
-      inputSchema: ZodRawShape;
+      inputSchema: ZodRawShape | ZodTypeAny;
       outputSchema: ZodRawShape;
+      annotations?: ToolModule["annotations"];
     },
     handler: RegistryToolHandler,
   ): void;
@@ -133,6 +142,12 @@ export const TOOL_REGISTRY: readonly ToolRegistration[] = [
     profiles: ["personal-production", "upstream-full"],
   },
   {
+    name: "create_task",
+    description: "Create exactly one new OmniFocus task in the Inbox after an explicit user request. This server may be running in a write-disabled canary mode; in that mode the tool validates the request and returns write_disabled without touching OmniFocus. V1 does not support projects, parent tasks, tags, repeats, notifications, batches, or updates. Do not use it for planning, recommendations, statements, or inferred future work.",
+    tool: createTaskTool,
+    profiles: ["personal-production"],
+  },
+  {
     name: "list_perspectives",
     description: "List all available perspectives in OmniFocus, including built-in perspectives (Inbox, Projects, Tags, etc.) and custom perspectives (Pro feature)",
     tool: listPerspectivesTool,
@@ -179,8 +194,9 @@ export function registerToolsForProfile(
         registration.name,
         {
           description: registration.description,
-          inputSchema: registration.tool.schema.shape,
+          inputSchema: registration.tool.inputSchema ?? registration.tool.schema.shape,
           outputSchema: registration.tool.outputSchema,
+          annotations: registration.tool.annotations,
         },
         handler,
       );
