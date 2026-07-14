@@ -1,4 +1,4 @@
-# create_task V1 Status
+# create_task V1/V2 Status
 
 ## 当前事实
 
@@ -8,6 +8,7 @@
 - `upstream-full` 已有 `add_omnifocus_task` mutation tool，但它不是自动成立的未来 V1 契约。
 - `list_tags` 和 `create_tag` 只在 `upstream-full` 注册；个人 Profile 中没有 Tag Tool。
 - ADR-005 要求分析与写入分离，并把授权、确认、审计、失败/回滚和重复保护作为 mutation gateway 的复审条件。
+- Phase 2A Project placement 设计已通过评审；Phase 2B 实现、禁写客户端门禁和隔离生产 Canary 已通过。公开 Project-specific flag 仍关闭，尚未扩大正式生产写入面。
 
 ## 当前判断
 
@@ -31,11 +32,13 @@ Refresh 后 Web 自动 UUID 禁写门禁已通过：单次调用返回 `write_di
 
 最终公开 Web/Tunnel create/read 已通过：`create_task` 一次成功，Web 按返回 ID 调用 `get_task` 一次成功且未重试；服务器按 ID/name 回读到同一 Inbox Task，默认字段正确、名称单对象、audit `success`、Ledger checksum/`verified`/权限正确且实际 `mutation.lock` 不存在。用户确认并人工删除后，ID/name 双 `not_found`、永久 tombstone、flag=`true` 与服务健康均通过终检。
 
+2026-07-14 Phase 2B：V2 要求显式 `destination`，并以 exact canonical Project ID 支持受独立 flag 保护的 Active Project 顶层 placement。首次隔离 Canary 因真实读侧 `parentId` 等于 Project root Task ID 而安全返回 `partial_success`，未重试；修订 ADR/verifier 后，第二次单调用 Canary 成功，`project.id` 与 `parentId` 均精确等于 requested Project root ID。用户人工删除后，ID/name 双 `not_found`、Ledger `verified/success`、audit/权限/无锁均通过。详见 [Phase 2B Project Placement Acceptance](./PHASE2B_PROJECT_PLACEMENT_ACCEPTANCE.md)。
+
 ## 当前生产边界
 
-- 仅在用户明确要求时创建一个 Inbox Task；
+- 正式公开路径仅在用户明确要求时创建一个 Inbox Task；Project placement 代码与 Canary 已验收，但 public Project-specific flag 仍为 false；
 - 每个新创建意图必须使用新的 UUID `idempotencyKey`，透明 retry 复用同一 key；
-- Project、parent、Tag、repeat、notification、batch、update、complete 和 delete 均不在个人生产写能力范围；
+- Project placement 只有在未来独立批准并开启 Project-specific flag 后才进入个人生产写能力；parent、Tag、repeat、notification、batch、update、complete 和 delete 仍不在范围；
 - 新增任何 mutation 或放宽字段前必须重新走 ADR、测试、禁写 Canary 和独立生产门禁。
 
 验收模板见 [Phase 1 Probes and Acceptance](./PHASE1_PROBES_AND_ACCEPTANCE.md)。历史方向见 [`create_task` 与 Tag 方向](../../history/evolution-summaries/create-task-and-tag-direction.md)。
