@@ -12,6 +12,36 @@
 > `actual.hierarchy.parentId === requestedProjectId`。这不授权 Phase 4 的普通
 > parent Task placement。
 
+> Phase 4 amendment（2026-07-14，已接受）：ordinary parent Task placement 继续暂缓，
+> 且只能在 T2 稳定运行后进入独立设计、风险评审与授权。Parent 是独立 destination，
+> 与 Project destination 互斥；只接受 freshly-read exact canonical parent Task ID，禁止
+> 名称解析、模糊匹配和 fallback。新建 child 本身不会形成 hierarchy cycle；cycle/reparent
+> validation 属于未来 move/edit existing Task，不进入 Phase 4。prepare/commit 只是优先评估
+> 方案，是否采用由客户端确认 UI、target binding 和 TOCTOU 证据决定。Phase 4 不扩展为
+> CRUD 或 generic mutation executor，T2 不得预建任何 parent-capable runtime。
+
+> Phase T1/T2 amendment（2026-07-14，已接受）：Phase T1 已完成，
+> `search_tags` 已注册到 `personal-production`。当前生产 surface 为五个
+> read Tool（`get_task`、`get_project`、`get_completed_since`、
+> `get_lean_snapshot`、`search_tags`）和唯一 mutation `create_task`，
+> 共精确六个 Tool、Resources absent。ADR 正文中关于四 Tool、五 Tool、
+> “当前没有 `create_task`”等表述只记录原 Phase 0/Phase 1 历史检查点，
+> 不再代表当前注册要求。
+>
+> Phase T2 继续使用单一 `create_task` Tool，只接受 1–5 个既有 Active
+> Tag 的 canonical `tagIds`。名称或 path 歧义由 `search_tags` 与客户端
+> 确认层处理，不进入 mutation resolver；ID-only runtime 不新增
+> `ambiguous_tag`。T2 runtime 的 Tag-specific errors 为
+> `tag_not_found`、`tag_not_allowed`、`mutually_exclusive_tags`、
+> `tag_validation_failed`，写后 exact-set 不一致使用 `partial_success`。
+>
+> No-tag intent 继续使用 `create_task:v2` semantic fingerprint；
+> tagged intent 使用 `create_task:v3:tagged`。T2 写前只验证 requested
+> Tags、各自 ancestor chains 与 direct-parent exclusivity，不把
+> `search_tags` snapshot 当作 mutation authorization。公开 `get_task`
+> 和共享 Task Domain 不因 T2 增加 canonical Tag IDs；Tag ID readback
+> 使用 mutation-only internal boundary。
+
 ## 1. 决策摘要
 
 `create_task` V1 是一个单阶段、Inbox-only、显式授权、带持久化幂等保护和写后精确读取的 mutation Tool。
@@ -37,7 +67,7 @@
 | 自动创建 Tag | `personal-production` 永久禁止 |
 | Inbox 边界 | Phase 1 全程 Inbox-only；只有 Phase 1 Production Acceptance 后，最早在 Phase 2 放开 |
 | Phase 2 首次能力 | 仅按实时验证的 canonical Project ID 创建到 Active Project；保持单阶段 |
-| Parent placement | 保留 Phase 4，并优先升级为 prepare/commit |
+| Parent placement | 保留 Phase 4；prepare/commit 仅作为优先评估方案，不是已决定实现 |
 
 ## 2. 当前仓库事实
 
@@ -215,9 +245,9 @@ create_task(payload)
 
 Phase 2 只有同时满足下列条件时，Project placement 才可继续单阶段 `create_task(payload)`：目标是来自真实只读查询结果的单个 canonical Project ID；服务端写入前实时重新验证；只允许 Active Project；客户端确认 UI 能展示明确目标；不做名称解析；不是批量或多目标；失败绝不回落 Inbox。
 
-出现以下任一条件时必须升级为 `prepare_task_creation -> commit_task_creation`：按名称解析 Project、同名或目标歧义、parent placement、批量、多目标、复杂 recurrence、notification、On Hold Tag、客户端不能可靠展示目标、需要确认多个转换结果，或风险显著提升。
+出现以下任一条件时必须升级为 `prepare_task_creation -> commit_task_creation`：按名称解析 Project、同名或目标歧义、批量、多目标、复杂 recurrence、notification、On Hold Tag、客户端不能可靠展示目标、需要确认多个转换结果，或风险显著提升。
 
-因此 Project placement 本身不自动要求两阶段；严格的单 Active Project ID 是 Phase 2 唯一可保持单阶段的扩展。Parent placement 固定留在 Phase 4，不能与 Phase 2 合并。
+因此 Project placement 本身不自动要求两阶段；严格的单 Active Project ID 是 Phase 2 唯一可保持单阶段的扩展。Ordinary parent placement 固定留在 Phase 4，不能与 Phase 2 合并；其是否采用 prepare/commit 必须由未来 Phase 4 的客户端确认 UI、target binding 和 TOCTOU 风险证据决定。
 
 ## 6. 输入 Schema
 
@@ -948,11 +978,16 @@ Retry-key 验收必须提供可观察证据，但不能记录任务内容。hand
 - readback 比较 requested/actual Tag IDs；不一致返回 `partial_success`；
 - On Hold 和 Dropped Tag 不进入 T2。
 
-### Phase 4：parent/prepare-commit（暂缓）
+### Phase 4：ordinary parent Task placement（继续暂缓）
 
-- 仅在独立设计后考虑 parentTaskId，并优先采用 prepare/commit；
-- 必须有 cycle/identity/status validation；
-- 不与 edit/move/complete/delete 合并为万能 Tool。
+- 仅在 T2 稳定运行并完成独立设计、风险评审与授权后，考虑为新建 Task 增加 ordinary parent placement；
+- Parent 是独立 destination，不得同时接受互相竞争的 Project destination 与 `parentTaskId`；
+- 只接受 freshly-read exact canonical parent Task ID，不接受名称、模糊匹配或 fallback；
+- 写入前必须重新验证 parent identity、kind、direct/effective completion/drop 状态、parent-chain integrity，以及 containing Project / Folder eligibility；
+- 创建一个全新子任务本身不存在 hierarchy cycle 风险；cycle/reparent validation 属于未来 move/edit existing Task 范围，不得借 Phase 4 引入；
+- prepare/commit 是优先评估的授权方案，而不是当前已决定的实现；是否采用应由客户端确认 UI、target binding 和 TOCTOU 风险证据决定；
+- Phase 4 不与 edit、move、reparent、complete、delete、batch 或其他 CRUD 合并，也不建立 generic mutation executor；
+- T2 不得为 Phase 4 提前增加 parent placeholder、prepare token、通用 placement resolver 或 parent-capable mutation primitive。
 
 ## 17. Future Existing-Tag Integration
 
@@ -992,7 +1027,18 @@ generic executor 隐藏创建
 
 ### 17.3 Tag 扩展错误
 
-T2 至少新增：`tag_not_found`、`tag_not_allowed`、`ambiguous_tag`、`mutually_exclusive_tags`、`tag_validation_failed`。所有预验证失败均必须发生在 Task 创建前；Tag 部分写入则返回 `partial_success`，不能普通成功或自动重试。
+名称或 path 歧义由 `search_tags` 与客户端确认层处理，不进入 T2
+mutation resolver。T2 runtime 至少新增：
+
+- `tag_not_found`
+- `tag_not_allowed`
+- `mutually_exclusive_tags`
+- `tag_validation_failed`
+
+所有可判定预验证失败必须发生在 Task 创建前。Task 已创建但 actual
+Tag ID set 与 requested 不一致时返回 `partial_success`，不得作为普通
+成功，也不得自动重试、补写、移除 Tag 或删除 Task。不可信 canonical
+identity 统一归入 `tag_validation_failed`。
 
 ## 18. 实施提交建议与检查表
 

@@ -10,6 +10,7 @@
 - ADR-005 要求分析与写入分离，并把授权、确认、审计、失败/回滚和重复保护作为 mutation gateway 的复审条件。
 - Phase 2A Project placement 设计已通过评审；Phase 2B 实现、禁写客户端门禁、隔离生产 Canary、人工清理和 fail-closed 正式启用均已通过。公开 Project-specific flag 已加载为 `true`。
 - Phase T1 既有 Tag 结构化发现设计、实现、protocol/capability、真实只读和 T1-D 生产注册验收已全部通过；`search_tags` 已进入个人 Profile，生产为精确六 Tool、Resources absent。
+- Phase T2-A 第二版设计、真实只读 capability probe 与独立评审已通过；T2-B 未发布内部实现已获准但尚未开始，`create_task` 仍是 V2，尚无 `tagIds` runtime。
 
 ## 当前判断
 
@@ -38,6 +39,8 @@ Refresh 后 Web 自动 UUID 禁写门禁已通过：单次调用返回 `write_di
 用户随后独立批准正式启用。fail-closed reload 后，plist 与 loaded LaunchAgent 的 global/Project flags 均为 `true`；Tunnel 状态健康、health/ready 与 watchdog 通过，协议表面仍为精确五 Tool、Resources capability absent。配置启用与终检未创建任何 Task。
 
 2026-07-14 Phase T1：`search_tags` 已完成 strict structured contract、单次完整 snapshot、三态/path/exclusivity Adapter、privacy-safe no-shell executor、deterministic tests、真实只读和 T1-D 注册部署。当前 26 个 Tag 均完成 canonical ID roundtrip；生产精确六 Tool、Resources absent。App Refresh 与 Tag-create 负向路由在 global fail-closed 下通过，模型未丢弃 Tag 要求，真实库 exact-name 为 `not_found`；global/Project flags 已恢复为 `true/true`。详见 [Phase T1 Tag Discovery Acceptance](./PHASE_T1_TAG_DISCOVERY_ACCEPTANCE.md)。
+
+Phase T2-A 审计确认官方/真实 API 提供 `Tag.byIdentifier`、`Task.addTags` 和 Task Tag ID readback，但当前 verifier 仍只消费 Tag names。[Phase T2 Tag Assignment Design](./PHASE_T2_TAG_ASSIGNMENT_DESIGN.md) 第二版及 ADR-006 amendment 已通过独立评审，冻结 V3 ID-only contract、独立 flag、request-closure validation、ancestor-active/互斥、no-tag V2/tagged V3 split fingerprint、mutation-only ID readback、actual 6+ 与 tagged replay 语义。T2-B 已获准但尚未开始；公开 Schema、生产 flags、Canary 和正式启用均未获授权。
 
 ## 当前生产边界
 

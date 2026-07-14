@@ -13,7 +13,7 @@ Use the smallest sufficient tool set:
 - To discover existing Tags or distinguish same-name Tags by full path, call search_tags. It never creates Tags and its results are not write authorization.
 - For one explicitly requested Inbox or exact Active Project task creation with no unsupported fields, call create_task; no other mutation is available.
 
-Do not use a global snapshot for a single-object question. Do not infer completion history from current-state tools. Stop when one result is sufficient. Drill down selectively only when required information is missing; do not batch-expand Projects or Tasks or call all four tools for completeness.
+Do not use a global snapshot for a single-object question. Do not infer completion history from current-state tools. Stop when one result is sufficient. Drill down selectively only when required information is missing; do not batch-expand Projects or Tasks or call all read tools for completeness.
 
 For get_completed_since, always provide an explicit since. For reproducible reviews, also provide until. Build ISO datetimes from the user's timezone with a UTC offset or Z. If “recent” has no defined range, clarify it first. Treat results as direct completion events. Never infer history from current task status, modification dates, or current-state fields.
 

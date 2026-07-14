@@ -24,18 +24,18 @@
 
 ## 进行中
 
-- 无；Phase T1 已完成，下一阶段须独立设计和批准。
+- Phase T2-A：既有 Active Tag ID 写入的第二版设计、真实只读 capability probe 和独立评审已通过；T2-B 未发布内部实现已获准但尚未开始，等待用户决定下一步动作。
 
 ## 已决定但未实施
 
 - Full Snapshot MCP 当前暂缓；低频完整分析走手动/plugin/file 导出，只有真实重复需求出现才复审。
 - Action 暂时留在 Task Domain；没有独立 `ActionView` 或 `get_action`。
 - 任何未来显式 mutation gateway 必须先定义用户授权、preview/confirmation、有限 mutation set、审计、失败/回滚和重复保护。
-- Phase T2 Tag 写入必须独立设计和批准，不因 T1 完成自动获得授权。
+- Phase T2 第二版设计与 ADR-006 amendment 已接受；T2-B 未发布实现已获准。T2-C Schema 发布、T2-D Canary 和 T2-E 正式启用仍须分别批准。
 
-## 待设计
+## 待实施
 
-- Phase T2 Tag 写入：canonical ID 实时重验、Active-only、最多 5 个、去重/互斥与 ID readback 仍待独立设计。
+- Phase T2 Tag 写入 runtime：V3 `tagIds`、独立 feature flag、primitive 内实时重验、最多 5 个、Active/ancestor-active、互斥检查、no-tag V2/tagged V3 split fingerprint 与独立 ID readback 尚未实施。
 
 ## 明确不在当前范围
 
@@ -51,6 +51,7 @@
 | 旧 `personal-readonly` 值 | 已移除且不提供 alias | resolver invalid-value tests、部署配置 |
 | `create_task` V2 | Phase 1 Inbox 与 Phase 2B Project placement 均正式启用；global/Project flags 正常生产值为 `true`，health/ready/watchdog 正常 | ADR-006、Checkpoint 6A/6B/6C/7、Phase 2A design、Phase 2B acceptance 与正式 enablement 记录 |
 | Tag Phase T1 | T1-A/B/C/D 全部通过；`search_tags` 已注册和部署，负向路由未创建无 Tag Task | Phase T1 design、748 tests、26/26 ID roundtrip、Phase T1 acceptance、exact-name `not_found` |
+| Tag Phase T2 | T2-A 设计、真实只读 capability probe 与独立评审通过；T2-B 已获准但未开始，公开 Schema/flags/Canary 均未实施 | Phase T2 design、ADR-006 amendment、官方 API、真实脱敏 read-only probe |
 | Legacy Tag | full-only `list_tags`/`create_tag` 保持不变；`create_tag` 永久不进入个人 Profile | registration 代码与测试 |
 
 详细证据见 [SOURCE_MAP.md](./SOURCE_MAP.md)。
