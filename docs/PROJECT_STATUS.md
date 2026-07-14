@@ -1,7 +1,7 @@
 # Project Status
 
 > 状态日期：2026-07-14
-> `create_task` V1 生产验收已完成；Phase 2B Project placement 代码与隔离生产 Canary 已通过，公开 Project-specific flag 仍关闭
+> `create_task` V1 生产验收与 Phase 2B Project placement 正式启用均已完成
 
 本页只记录当前可由代码、测试、Accepted ADR 或已冻结文档支持的状态，不把后续方向写成已实现能力。
 
@@ -18,10 +18,11 @@
 - `personal-production` 重构已部署；`create_task` Checkpoint 6A/6B/6C 已通过。Checkpoint 7 corrected Schema 的 Refresh/禁写门禁通过后，LaunchAgent 已 fail-closed 正式恢复并加载 `OMNIFOCUS_CREATE_TASK_ENABLED=true`，health/ready 与 watchdog 正常。
 - `create_task` Checkpoint 7 已完整通过：公开 Web 单次创建/ID 回读、服务器 ID/name 同对象、audit、Ledger、无锁、人工删除、双 `not_found` 与最终生产健康全部验收通过。
 - `create_task` Phase 2B 已通过设计、实现、禁写客户端门禁和隔离生产 Canary：Project 顶层 Task 的 `project.id` 与 `parentId` 均精确等于 requested Project root ID；人工删除后的 ID/name 双 `not_found`、Ledger、audit、权限和无锁终检通过。
+- 用户独立批准 Phase 2B 正式启用；fail-closed reload 后 plist/loaded global 与 Project flags 均为 `true`，Tunnel status healthy、health/ready 与 watchdog 通过，五 Tool/零 Resources 边界未变化，启用过程未创建 Task。
 
 ## 进行中
 
-- Phase 2B 等待独立的正式公开启用决策；`OMNIFOCUS_CREATE_TASK_PROJECT_ENABLED` 当前保持 unset/false。
+- 无；`create_task` V1 与 Phase 2B 当前实施、验收和正式启用均已完成。
 
 ## 已决定但未实施
 
@@ -35,8 +36,8 @@
 
 ## 明确不在当前范围
 
-- 当前公开生产写入仍仅限显式调用 `create_task` 创建一个 Inbox Task；Phase 2B Project placement 尚未正式启用。
-- Project-specific flag 未独立批准并开启前，Project destination 必须 fail closed；parent、Tag、batch、repeat、notifications、update/delete 均未授权。
+- 当前公开生产写入仅限显式调用 `create_task` 创建一个 Task，destination 必须为 Inbox 或单个 exact Active Project；不得名称解析、猜测 ID 或回落 Inbox。
+- parent、Tag、batch、repeat、notifications、update/delete 仍未授权。
 - 当前没有承诺 AI 自动决策、自动编辑/完成/删除或把分析结果自动写回 OmniFocus。
 
 ## 当前节点
@@ -46,7 +47,7 @@
 | `personal-production` | 已部署；默认 Profile；四个 Domain read tools + 正式启用的 `create_task` V1，无 Resources | profile/registration 代码与测试、部署 status、精确五 Tool 协议与 Checkpoint 7 验收 |
 | 旧 `personal-readonly` 值 | 已移除且不提供 alias | resolver invalid-value tests、部署配置 |
 | `create_task` V1 | Checkpoint 6A/6B/6C/7 全部通过；公开 flag=`true`；最终 Task 已人工删除并通过 ID/name 双 `not_found` | ADR-006、strict fail-closed feature flag、646 tests、wire Schema、只读/retry/production Canary 与 Checkpoint 7 部署验收记录 |
-| `create_task` Phase 2B | Project placement 实现和隔离生产 Canary 已通过；公开 Project-specific flag=`false`，等待独立启用决策 | ADR-006 amendment、Phase 2A design、`edfccd0`、`e3fc05b`、690 tests、Phase 2B acceptance |
+| `create_task` Phase 2B | Project placement 已正式启用；global/Project flags=`true`，health/ready/watchdog 正常 | ADR-006 amendment、Phase 2A design、`edfccd0`、`e3fc05b`、690 tests、Phase 2B acceptance 与正式 enablement 记录 |
 | Tag | full-only `list_tags`/`create_tag` 已存在；个人生产 Tag Tool 未正式设计/实施 | registration 代码与测试 |
 
 详细证据见 [SOURCE_MAP.md](./SOURCE_MAP.md)。

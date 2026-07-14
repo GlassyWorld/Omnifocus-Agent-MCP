@@ -1,6 +1,6 @@
 # `create_task` Phase 2B Project Placement Acceptance
 
-Status: implementation and isolated production Canary passed on 2026-07-14. Public Project placement remains disabled pending a separate formal enablement decision.
+Status: passed and formally enabled on 2026-07-14. Implementation, disabled client gate, isolated production Canary, manual cleanup, fail-closed public enablement, and final health/capability verification all passed.
 
 ## Authorization and scope
 
@@ -116,15 +116,60 @@ The user confirmed and manually deleted the second Canary Task. Final MCP read v
 - audit remained privacy-safe;
 - mutation lock remained absent.
 
-## Final boundary and decision gate
+## Formal public enablement
 
-Phase 2B implementation and isolated production Canary are accepted. This acceptance does not itself enable public Project placement.
+After the isolated Canary and cleanup passed, the user explicitly approved both temporary-evidence cleanup and formal public Project placement enablement.
+
+Pre-enable gates passed again:
+
+- 43 test files / 690 tests;
+- `npm run build`;
+- `git diff --check`;
+- main LaunchAgent and watchdog configuration valid;
+- main service running, watchdog loaded, Tunnel process present;
+- `healthz=live` and `readyz=ready`;
+- existing global create flag exactly `true`;
+- Project-specific flag absent before enablement.
+
+A fail-closed controller then:
+
+1. preserved the original main LaunchAgent plist with no Project flag;
+2. staged and linted a plist with `OMNIFOCUS_CREATE_TASK_PROJECT_ENABLED=true`;
+3. unloaded watchdog and main jobs so launchd could load the new environment;
+4. bootstrapped the main job with bounded retry and waited for `live` / `ready`;
+5. restored the watchdog;
+6. verified both plist and loaded LaunchAgent values;
+7. retained automatic rollback to the original disabled plist for any failure before final acceptance.
+
+Enablement result:
+
+- `PLIST_GLOBAL_FLAG=true`;
+- `PLIST_PROJECT_FLAG=true`;
+- `LOADED_GLOBAL_FLAG=true`;
+- `LOADED_PROJECT_FLAG=true`;
+- `healthz=live`;
+- `readyz=ready`;
+- watchdog loaded.
+
+An independent post-enable Tunnel status check returned `STATUS_RESULT=healthy`, with valid configuration, running main service, loaded watchdog, present process, and `live` / `ready` endpoints.
+
+A fresh MCP protocol session against the enabled build confirmed:
+
+- exactly five Tools: `create_task`, `get_task`, `get_project`, `get_completed_since`, and `get_lean_snapshot`;
+- Resources capability absent;
+- `create_task.required` contains `name`, `destination`, and `idempotencyKey`;
+- `additionalProperties=false`;
+- existing Schema/handler tests accept exactly the Inbox and Project destination variants and reject omitted or out-of-scope destinations.
+
+No Task was created during configuration enablement or post-enable capability checks.
+
+## Final production boundary
+
+Phase 2B Project placement is now formally enabled on the public `personal-production` path.
 
 Current production boundary:
 
-- global `create_task` remains enabled for the previously accepted Inbox path;
-- public `OMNIFOCUS_CREATE_TASK_PROJECT_ENABLED` remains unset/false;
-- Project placement therefore returns `write_disabled` before Ledger, resolver, lock, or JXA;
+- global `create_task` and the independent Project-specific flag are both exactly `true` in the plist and loaded LaunchAgent;
+- each authorized call creates at most one Task in explicit Inbox or at the top level of one exact Active Project;
+- Project placement still requires a canonical read-side Project ID, prewrite real-time validation, exact root hierarchy readback, and no Inbox fallback;
 - parent Task placement and every other excluded mutation remain unavailable.
-
-Formal public Project enablement requires a separate explicit user decision, fail-closed deployment with the Project-specific flag, refreshed capability verification, health/readiness checks, and an immediate rollback to `false` on any unexpected result.
