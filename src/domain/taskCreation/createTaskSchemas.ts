@@ -55,7 +55,7 @@ export const createTaskPublicInputShape = {
   idempotencyKey: createTaskIdempotencyKeySchema,
 } as const;
 
-function validateDateRelationships(
+export function validateDateRelationships(
   value: { deferDate?: string; dueDate?: string },
   context: z.RefinementCtx,
 ): void {

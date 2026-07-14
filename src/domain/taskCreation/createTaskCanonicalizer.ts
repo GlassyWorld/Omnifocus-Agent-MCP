@@ -5,6 +5,12 @@ import {
   CreateTaskInput,
   CreateTaskWarning,
 } from "./createTaskSchemas.js";
+import type {
+  CanonicalTaggedCreateTaskPayload,
+  TaggedCreateTaskInput,
+} from "./createTaskTagSchemas.js";
+
+export const TAGGED_CREATE_TASK_FINGERPRINT_NAMESPACE = "create_task:v3:tagged";
 
 function canonicalDate(value: string | undefined): string | null {
   return value === undefined ? null : new Date(value).toISOString();
@@ -33,6 +39,25 @@ export function fingerprintCreateTaskPayload(payload: CanonicalCreateTaskPayload
     .digest("hex");
 }
 
+export function canonicalizeTaggedCreateTaskInput(
+  input: TaggedCreateTaskInput,
+): CanonicalTaggedCreateTaskPayload {
+  return {
+    ...canonicalizeCreateTaskInput(input),
+    tagIds: [...input.tagIds].sort(compareCodeUnits),
+  };
+}
+
+export function fingerprintTaggedCreateTaskPayload(
+  payload: CanonicalTaggedCreateTaskPayload,
+): string {
+  return createHash("sha256")
+    .update(TAGGED_CREATE_TASK_FINGERPRINT_NAMESPACE)
+    .update("\0")
+    .update(JSON.stringify(payload))
+    .digest("hex");
+}
+
 export function createTaskWarnings(payload: CanonicalCreateTaskPayloadV2): CreateTaskWarning[] {
   const warnings: CreateTaskWarning[] = [];
   if (payload.plannedDate !== null && payload.deferDate !== null) {
@@ -52,4 +77,8 @@ export function createTaskWarnings(payload: CanonicalCreateTaskPayloadV2): Creat
     }
   }
   return warnings;
+}
+
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
