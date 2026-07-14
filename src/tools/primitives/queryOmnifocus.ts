@@ -180,6 +180,7 @@ function generateQueryScript(params: QueryOmnifocusParams): string {
         var folder = project.parentFolder;
         while (folder) {
           if (folder.status === Folder.Status.Dropped) return true;
+          if (folder.status !== Folder.Status.Active) return null;
           folder = folder.parentFolder;
         }
         return false;
@@ -727,6 +728,8 @@ function generateFieldMapping(entity: string, fields?: string[]): string {
       return `folderName: item.parentFolder ? item.parentFolder.name : null`;
     } else if (field === 'folderId' && entity === 'projects') {
       return `folderId: item.parentFolder ? item.parentFolder.id.primaryKey : null`;
+    } else if (field === 'ancestorFolderDropped' && entity === 'projects') {
+      return `ancestorFolderDropped: isAncestorFolderDropped(item)`;
     } else if (field === 'folderID') {
       return `folderID: item.parentFolder ? item.parentFolder.id.primaryKey : null`;
     } else if (field === 'directTaskIds' && entity === 'projects') {

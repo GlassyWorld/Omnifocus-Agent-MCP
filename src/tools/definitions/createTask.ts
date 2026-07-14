@@ -13,10 +13,13 @@ import {
   createTaskSuccessSchema,
 } from "../../domain/taskCreation/createTaskSchemas.js";
 import { createInboxTask } from "../primitives/createInboxTask.js";
+import { createTaskInProject } from "../primitives/createTaskInProject.js";
 import { getTask } from "../primitives/getTask.js";
 import { isCreateTaskMutationEnabled } from "../../config/createTaskFeatureFlag.js";
+import { isCreateTaskProjectPlacementEnabled } from "../../config/createTaskProjectFeatureFlag.js";
 import { canonicalizeCreateTaskInput } from "../../domain/taskCreation/createTaskCanonicalizer.js";
 import { hashIdempotencyKey } from "../../domain/taskCreation/createTaskLedger.js";
+import { resolveProjectById } from "../../domain/taskCreation/projectDestination.js";
 
 // MCP SDK 1.29 serializes refined/effects schemas as an empty JSON Schema.
 // Register a strict ZodObject so clients receive the complete properties and
@@ -40,7 +43,7 @@ export interface CreateTaskCanaryAuditRecord {
   requestMetadataHash: string;
   argsIdempotencyKeyHash: string;
   effectiveKeyHash: string;
-  resultCode: "write_disabled" | "success" | CreateTaskOperationError["detail"]["code"];
+  resultCode: string;
   elapsedMs: number;
 }
 
@@ -72,6 +75,8 @@ function defaultService(): CreateTaskHandlerService {
       stateDirectory: join(homedir(), "Library", "Application Support", "OmniFocus-MCP", "create-task-v1"),
     }),
     createInboxTask,
+    createTaskInProject,
+    resolveProjectById,
     readTaskById: taskId => getTask({ id: taskId }),
   });
 }
@@ -100,7 +105,7 @@ export async function handler(
   if (!parsed.success) {
     return errorResponse(new CreateTaskOperationError({
       code: "invalid_arguments",
-      message: "The create_task arguments do not satisfy the strict V1 contract.",
+      message: "The create_task arguments do not satisfy the strict V2 contract.",
       mayHaveWritten: false,
       retrySafe: false,
     }));
@@ -134,6 +139,20 @@ export async function handler(
     }));
   }
 
+  if (
+    parsed.data.destination.kind === "project"
+    && !isCreateTaskProjectPlacementEnabled(env)
+  ) {
+    emitCanaryAudit(auditSink, canaryMetadata, "write_disabled", startedAt);
+    return errorResponse(new CreateTaskOperationError({
+      code: "write_disabled",
+      message: "Project placement is registered for canary validation but mutation is disabled.",
+      mayHaveWritten: false,
+      retrySafe: false,
+      reason: "project_placement_disabled",
+    }));
+  }
+
   try {
     const activeService = service ?? defaultService();
     const result = createTaskSuccessSchema.parse(
@@ -146,7 +165,12 @@ export async function handler(
     };
   } catch (error) {
     if (error instanceof CreateTaskOperationError) {
-      emitCanaryAudit(auditSink, canaryMetadata, error.detail.code, startedAt);
+      emitCanaryAudit(
+        auditSink,
+        canaryMetadata,
+        error.detail.reason ? `${error.detail.code}.${error.detail.reason}` : error.detail.code,
+        startedAt,
+      );
       return errorResponse(error);
     }
     const operationError = new CreateTaskOperationError({

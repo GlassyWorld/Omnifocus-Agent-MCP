@@ -75,6 +75,11 @@ describe("getServerInstructions", () => {
     expect(instructions).toContain("reuse exactly the same key");
     expect(instructions).toContain("Do not ask the user to supply");
     expect(instructions).toContain("planning, recommendations, statements, analysis");
+    expect(instructions).toContain("destination is always explicit");
+    expect(instructions).toContain("fresh get_project read");
+    expect(instructions).toContain("Project name plus the available Folder");
+    expect(instructions).toContain("A prior get_project call alone is insufficient");
+    expect(instructions).toContain("separately accepted prepare/commit flow");
   });
 
   it("keeps full-profile guidance and requires explicit write authorization", () => {

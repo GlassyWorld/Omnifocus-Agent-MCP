@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { nonEmptyStringSchema } from "../domainSchemas.js";
 
-export const CREATE_TASK_FINGERPRINT_NAMESPACE = "create_task:v1";
+export const CREATE_TASK_FINGERPRINT_NAMESPACE = "create_task:v2";
+export const canonicalOmniFocusIdSchema = nonEmptyStringSchema;
 
 function hasLoneSurrogate(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
@@ -38,6 +40,13 @@ export const createTaskInputShape = {
   deferDate: createTaskAbsoluteDateTimeSchema.optional(),
   flagged: z.boolean().optional(),
   estimatedMinutes: z.number().int().positive().max(10_080).optional(),
+  destination: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("inbox") }).strict(),
+    z.object({
+      kind: z.literal("project"),
+      projectId: canonicalOmniFocusIdSchema,
+    }).strict(),
+  ]),
   idempotencyKey: createTaskIdempotencyKeySchema.optional(),
 } as const;
 
@@ -77,7 +86,7 @@ export const createTaskPublicInputSchema = z.object(createTaskPublicInputShape)
 
 export type CreateTaskInput = z.infer<typeof createTaskInputSchema>;
 
-export interface CanonicalCreateTaskPayload {
+export interface CanonicalCreateTaskPayloadV2 {
   name: string;
   note: string;
   plannedDate: string | null;
@@ -85,13 +94,25 @@ export interface CanonicalCreateTaskPayload {
   deferDate: string | null;
   flagged: boolean;
   estimatedMinutes: number | null;
+  destination:
+    | { kind: "inbox" }
+    | { kind: "project"; projectId: string };
 }
+
+export const createdTaskLocationSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("inbox") }).strict(),
+  z.object({
+    kind: z.literal("project"),
+    projectId: canonicalOmniFocusIdSchema,
+    projectName: z.string(),
+  }).strict(),
+]);
 
 export const createdTaskViewSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   note: z.string(),
-  location: z.object({ kind: z.literal("inbox") }).strict(),
+  location: createdTaskLocationSchema,
   plannedDate: createTaskAbsoluteDateTimeSchema.nullable(),
   dueDate: createTaskAbsoluteDateTimeSchema.nullable(),
   deferDate: createTaskAbsoluteDateTimeSchema.nullable(),
@@ -104,8 +125,10 @@ export type CreatedTaskView = z.infer<typeof createdTaskViewSchema>;
 export const createTaskWarningSchema = z.object({
   code: z.enum([
     "planned_before_defer",
-    "planned_after_due",
-    "replayed_current_state_changed",
+      "planned_after_due",
+      "replayed_current_state_changed",
+      "project_state_changed_after_creation",
+      "project_state_unverified_after_creation",
   ]),
   message: z.string(),
 }).strict();

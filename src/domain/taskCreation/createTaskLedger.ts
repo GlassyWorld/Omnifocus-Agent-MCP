@@ -18,6 +18,7 @@ export type CreateTaskLedgerState =
   | "write_started"
   | "task_created"
   | "verified"
+  | "retryable_validation_error"
   | "terminal_prewrite_error"
   | "verification_failed"
   | "outcome_unknown";
@@ -48,8 +49,9 @@ export interface CreateTaskLedgerOptions {
 }
 
 const ALLOWED_TRANSITIONS: Record<CreateTaskLedgerState, readonly CreateTaskLedgerState[]> = {
-  reserved: ["write_started", "terminal_prewrite_error"],
-  write_started: ["task_created", "terminal_prewrite_error", "outcome_unknown"],
+  reserved: ["write_started", "retryable_validation_error", "terminal_prewrite_error"],
+  write_started: ["task_created", "retryable_validation_error", "terminal_prewrite_error", "outcome_unknown"],
+  retryable_validation_error: ["write_started", "retryable_validation_error", "terminal_prewrite_error"],
   task_created: ["verified", "verification_failed"],
   verification_failed: ["verified"],
   verified: [],

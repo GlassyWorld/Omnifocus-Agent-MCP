@@ -1,9 +1,9 @@
 import { readFile } from "fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { CanonicalCreateTaskPayload } from "../../domain/taskCreation/createTaskSchemas.js";
-import { createInboxTask, JxaJsonExecutor, _testExports } from "./createInboxTask.js";
+import type { CanonicalCreateTaskPayloadV2 } from "../../domain/taskCreation/createTaskSchemas.js";
+import { createInboxTask, type JxaJsonExecutor, _testExports } from "./createInboxTask.js";
 
-const payload: CanonicalCreateTaskPayload = {
+const payload: CanonicalCreateTaskPayloadV2 = {
   name: "Task ' \" \\ 📌",
   note: "line 1\nline 2",
   plannedDate: "2026-07-14T07:00:00.000Z",
@@ -11,6 +11,7 @@ const payload: CanonicalCreateTaskPayload = {
   deferDate: null,
   flagged: false,
   estimatedMinutes: 30,
+  destination: { kind: "inbox" },
 };
 
 describe("createInboxTask primitive", () => {

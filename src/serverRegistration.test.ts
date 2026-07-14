@@ -93,6 +93,7 @@ describe("profile-specific server registration", () => {
       expect(createTask?.inputSchema.type).toBe("object");
       expect(Object.keys(createTask?.inputSchema.properties ?? {}).sort()).toEqual([
         "deferDate",
+        "destination",
         "dueDate",
         "estimatedMinutes",
         "flagged",
@@ -102,6 +103,7 @@ describe("profile-specific server registration", () => {
         "plannedDate",
       ]);
       expect(createTask?.inputSchema.required?.slice().sort()).toEqual([
+        "destination",
         "idempotencyKey",
         "name",
       ]);
@@ -146,9 +148,15 @@ describe("profile-specific server registration", () => {
     expect(createInputSchema.safeParse({ name: "Task" }).success).toBe(false);
     expect(createInputSchema.safeParse({
       name: "Task",
+      destination: { kind: "inbox" },
       idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
     }).success).toBe(true);
     expect(createInputSchema.safeParse({ name: "Task", destination: { kind: "inbox" } }).success).toBe(false);
+    expect(createInputSchema.safeParse({
+      name: "Task",
+      destination: { kind: "project", projectId: "project-1" },
+      idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+    }).success).toBe(true);
   });
 
   it("registers the complete upstream tool and resource surface for upstream-full", () => {

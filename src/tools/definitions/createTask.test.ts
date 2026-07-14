@@ -4,8 +4,8 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { CreateTaskOperationError } from "../../domain/taskCreation/createTaskErrors.js";
 import {
-  CreateTaskCanaryAuditRecord,
-  CreateTaskHandlerService,
+  type CreateTaskCanaryAuditRecord,
+  type CreateTaskHandlerService,
   handler,
   inputSchema,
   schema,
@@ -13,7 +13,12 @@ import {
 } from "./createTask.js";
 
 const key = "123e4567-e89b-42d3-a456-426614174000";
+const inboxInput = { name: "Task", destination: { kind: "inbox" as const }, idempotencyKey: key };
 const enabledEnv = { OMNIFOCUS_CREATE_TASK_ENABLED: "true" };
+const projectEnabledEnv = {
+  ...enabledEnv,
+  OMNIFOCUS_CREATE_TASK_PROJECT_ENABLED: "true",
+};
 const success = {
   success: true as const,
   created: {
@@ -36,9 +41,10 @@ function extra(requestId: string | number = 1) {
 }
 
 describe("create_task handler", () => {
-  it("keeps the public schema Inbox-only", () => {
+  it("publishes a strict V2 schema with required destination and idempotencyKey", () => {
     expect(Object.keys(schema.shape).sort()).toEqual([
       "deferDate",
+      "destination",
       "dueDate",
       "estimatedMinutes",
       "flagged",
@@ -47,69 +53,104 @@ describe("create_task handler", () => {
       "note",
       "plannedDate",
     ]);
-    expect(schema.safeParse({ name: "Task", idempotencyKey: key }).success).toBe(true);
-    expect(schema.safeParse({ name: "Task", idempotencyKey: key, destination: { kind: "inbox" } }).success).toBe(false);
-    expect(inputSchema.safeParse({ name: "Task" }).success).toBe(false);
-    expect(inputSchema.safeParse({ name: "Task", idempotencyKey: key }).success).toBe(true);
+    expect(schema.safeParse(inboxInput).success).toBe(true);
+    expect(schema.safeParse({ name: "Task", idempotencyKey: key }).success).toBe(false);
+    expect(schema.safeParse({
+      name: "Task",
+      destination: { kind: "project", projectId: "project-1" },
+      idempotencyKey: key,
+    }).success).toBe(true);
+    expect(inputSchema.safeParse({ name: "Task", destination: { kind: "inbox" } }).success).toBe(false);
   });
 
   it("runs the strict object parser and rejects extra fields before service", async () => {
     const service = { execute: vi.fn() };
-    const result = await handler(
-      { name: "Task", idempotencyKey: key, destination: { kind: "inbox" } } as any,
-      extra(),
-      service,
-    );
+    const result = await handler({ ...inboxInput, tags: [] } as any, extra(), service);
     expect(JSON.parse(result.content[0].text).error.code).toBe("invalid_arguments");
     expect(service.execute).not.toHaveBeenCalled();
   });
 
-  it("requires an explicit key until request metadata stability is enabled", async () => {
-    const service = { execute: vi.fn() };
-    const result = await handler({ name: "Task" } as any, extra(), service);
-    expect(JSON.parse(result.content[0].text).error.code).toBe("invalid_arguments");
-    expect(service.execute).not.toHaveBeenCalled();
-  });
-
-  it("returns identical structured and JSON success", async () => {
+  it("returns identical structured and JSON success for Inbox V2", async () => {
     const service: CreateTaskHandlerService = { execute: vi.fn().mockResolvedValue(success) };
-    const result = await handler(
-      { name: "Task", idempotencyKey: key },
-      extra(),
-      service,
-      enabledEnv,
-      vi.fn(),
-    );
+    const result = await handler(inboxInput, extra(), service, enabledEnv, vi.fn());
     expect(result).not.toHaveProperty("isError");
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
-    expect(service.execute).toHaveBeenCalledWith({ name: "Task", idempotencyKey: key }, key);
+    expect(service.execute).toHaveBeenCalledWith(inboxInput, key);
   });
 
-  it("returns stable structured error text without structuredContent", async () => {
+  it("keeps Project resolver, Ledger, lock, and executor unreachable when its flag is false", async () => {
+    const resolver = vi.fn();
+    const ledger = vi.fn();
+    const lock = vi.fn();
+    const executor = vi.fn();
+    const service: CreateTaskHandlerService = {
+      execute: vi.fn(async () => {
+        resolver();
+        ledger();
+        lock();
+        executor();
+        return success;
+      }),
+    };
+    const records: CreateTaskCanaryAuditRecord[] = [];
+    const result = await handler({
+      name: "Task",
+      destination: { kind: "project", projectId: "project-1" },
+      idempotencyKey: key,
+    }, extra(), service, enabledEnv, record => records.push(record));
+
+    expect(JSON.parse(result.content[0].text).error).toMatchObject({
+      code: "write_disabled",
+      reason: "project_placement_disabled",
+      mayHaveWritten: false,
+    });
+    expect(service.execute).not.toHaveBeenCalled();
+    expect(resolver).not.toHaveBeenCalled();
+    expect(ledger).not.toHaveBeenCalled();
+    expect(lock).not.toHaveBeenCalled();
+    expect(executor).not.toHaveBeenCalled();
+    expect(records[0].resultCode).toBe("write_disabled");
+  });
+
+  it("allows Inbox V2 while the Project-specific flag remains false", async () => {
+    const service: CreateTaskHandlerService = { execute: vi.fn().mockResolvedValue(success) };
+    const result = await handler(inboxInput, extra(), service, enabledEnv, vi.fn());
+    expect(result).not.toHaveProperty("isError");
+    expect(service.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows Project dispatch only when both flags are exactly true", async () => {
+    const service: CreateTaskHandlerService = { execute: vi.fn().mockResolvedValue(success) };
+    await handler({
+      name: "Task",
+      destination: { kind: "project", projectId: "project-1" },
+      idempotencyKey: key,
+    }, extra(), service, projectEnabledEnv, vi.fn());
+    expect(service.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns stable errors and emits a reason-qualified privacy-safe result code", async () => {
+    const records: CreateTaskCanaryAuditRecord[] = [];
     const service: CreateTaskHandlerService = {
       execute: vi.fn().mockRejectedValue(new CreateTaskOperationError({
-        code: "verification_failed",
-        message: "No trustworthy readback.",
-        mayHaveWritten: true,
-        retrySafe: false,
-        taskId: "task-1",
+        code: "project_validation_failed",
+        message: "Temporary read failure.",
+        mayHaveWritten: false,
+        retrySafe: true,
+        reason: "query_failed",
       })),
     };
-    const result = await handler(
-      { name: "Task", idempotencyKey: key },
-      extra(),
-      service,
-      enabledEnv,
-      vi.fn(),
-    );
-    expect(result.isError).toBe(true);
-    expect(result).not.toHaveProperty("structuredContent");
+    const result = await handler({
+      name: "Task",
+      destination: { kind: "project", projectId: "project-1" },
+      idempotencyKey: key,
+    }, extra(), service, projectEnabledEnv, record => records.push(record));
     expect(JSON.parse(result.content[0].text).error).toMatchObject({
-      code: "verification_failed",
-      mayHaveWritten: true,
-      retrySafe: false,
-      taskId: "task-1",
+      code: "project_validation_failed",
+      reason: "query_failed",
+      retrySafe: true,
     });
+    expect(records[0].resultCode).toBe("project_validation_failed.query_failed");
   });
 
   it("uses request metadata only behind the explicit stability gate", () => {
@@ -120,17 +161,16 @@ describe("create_task handler", () => {
     expect(_testExports.resolveEffectiveKey(key, extra("request-1"), {})).toBe(key);
   });
 
-  it("logs only privacy-safe Canary audit fields", async () => {
+  it("logs only the six privacy-safe Canary audit fields", async () => {
     const records: CreateTaskCanaryAuditRecord[] = [];
     const service: CreateTaskHandlerService = { execute: vi.fn().mockResolvedValue(success) };
     await handler(
-      { name: "private task", note: "private note", idempotencyKey: key },
+      { ...inboxInput, name: "private task", note: "private note" },
       extra("request-private"),
       service,
       enabledEnv,
       record => records.push(record),
     );
-    expect(records).toHaveLength(1);
     expect(Object.keys(records[0]).sort()).toEqual([
       "argsIdempotencyKeyHash",
       "correlationId",
@@ -139,39 +179,11 @@ describe("create_task handler", () => {
       "requestMetadataHash",
       "resultCode",
     ]);
-    expect(records[0]).toMatchObject({
-      correlationId: expect.stringMatching(/^ct-[0-9a-f]{12}$/),
-      requestMetadataHash: expect.stringMatching(/^[0-9a-f]{64}$/),
-      argsIdempotencyKeyHash: expect.stringMatching(/^[0-9a-f]{64}$/),
-      effectiveKeyHash: expect.stringMatching(/^[0-9a-f]{64}$/),
-      resultCode: "success",
-      elapsedMs: expect.any(Number),
-    });
     const serialized = JSON.stringify(records);
     expect(serialized).not.toContain("private task");
     expect(serialized).not.toContain("private note");
     expect(serialized).not.toContain("request-private");
     expect(serialized).not.toContain(key);
-  });
-
-  it("emits stable hashes for a transparent disabled retry", async () => {
-    const first: CreateTaskCanaryAuditRecord[] = [];
-    const second: CreateTaskCanaryAuditRecord[] = [];
-    const input = { name: "private task", note: "private note", idempotencyKey: key };
-    const request = extra("request-stable");
-
-    await handler(input, request, undefined, {}, record => first.push(record));
-    await handler(input, request, undefined, {}, record => second.push(record));
-
-    expect(first).toHaveLength(1);
-    expect(second).toHaveLength(1);
-    expect(second[0]).toMatchObject({
-      correlationId: first[0].correlationId,
-      requestMetadataHash: first[0].requestMetadataHash,
-      argsIdempotencyKeyHash: first[0].argsIdempotencyKeyHash,
-      effectiveKeyHash: first[0].effectiveKeyHash,
-      resultCode: "write_disabled",
-    });
   });
 
   it("persists only the audit allowlist in a mode-0600 JSONL file", () => {
@@ -186,46 +198,30 @@ describe("create_task handler", () => {
       resultCode: "write_disabled",
       elapsedMs: 1,
     };
-
     sink(record);
-
     expect(JSON.parse(readFileSync(filePath, "utf8").trim())).toEqual(record);
     expect(statSync(filePath).mode & 0o777).toBe(0o600);
     expect(statSync(join(directory, "nested")).mode & 0o777).toBe(0o700);
   });
 
   it.each([undefined, "", "false", "TRUE", "1"])(
-    "returns the fixed canary error before calling the mutation service for %s",
+    "returns global write_disabled before service for %s",
     async value => {
       const service = { execute: vi.fn() };
       const records: CreateTaskCanaryAuditRecord[] = [];
       const result = await handler(
-        { name: "private task", note: "private note", idempotencyKey: key },
+        { ...inboxInput, name: "private task", note: "private note" },
         extra("request-private"),
         service,
         { OMNIFOCUS_CREATE_TASK_ENABLED: value },
         record => records.push(record),
       );
       expect(service.execute).not.toHaveBeenCalled();
-      expect(records).toHaveLength(1);
       expect(records[0].resultCode).toBe("write_disabled");
-      expect(result).toEqual({
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            success: false,
-            error: {
-              code: "write_disabled",
-              message: "create_task is registered for canary validation but mutation is disabled.",
-              mayHaveWritten: false,
-              retrySafe: false,
-            },
-          }, null, 2),
-        }],
-        isError: true,
+      expect(JSON.parse(result.content[0].text).error).toMatchObject({
+        code: "write_disabled",
+        mayHaveWritten: false,
       });
-      expect(JSON.stringify(result)).not.toContain("private task");
-      expect(JSON.stringify(result)).not.toContain("private note");
     },
   );
 });

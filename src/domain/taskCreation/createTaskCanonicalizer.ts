@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import {
-  CanonicalCreateTaskPayload,
+  CanonicalCreateTaskPayloadV2,
   CREATE_TASK_FINGERPRINT_NAMESPACE,
   CreateTaskInput,
   CreateTaskWarning,
@@ -10,7 +10,7 @@ function canonicalDate(value: string | undefined): string | null {
   return value === undefined ? null : new Date(value).toISOString();
 }
 
-export function canonicalizeCreateTaskInput(input: CreateTaskInput): CanonicalCreateTaskPayload {
+export function canonicalizeCreateTaskInput(input: CreateTaskInput): CanonicalCreateTaskPayloadV2 {
   return {
     name: input.name.trim(),
     note: input.note ?? "",
@@ -19,10 +19,13 @@ export function canonicalizeCreateTaskInput(input: CreateTaskInput): CanonicalCr
     deferDate: canonicalDate(input.deferDate),
     flagged: input.flagged ?? false,
     estimatedMinutes: input.estimatedMinutes ?? null,
+    destination: input.destination.kind === "inbox"
+      ? { kind: "inbox" }
+      : { kind: "project", projectId: input.destination.projectId },
   };
 }
 
-export function fingerprintCreateTaskPayload(payload: CanonicalCreateTaskPayload): string {
+export function fingerprintCreateTaskPayload(payload: CanonicalCreateTaskPayloadV2): string {
   return createHash("sha256")
     .update(CREATE_TASK_FINGERPRINT_NAMESPACE)
     .update("\0")
@@ -30,7 +33,7 @@ export function fingerprintCreateTaskPayload(payload: CanonicalCreateTaskPayload
     .digest("hex");
 }
 
-export function createTaskWarnings(payload: CanonicalCreateTaskPayload): CreateTaskWarning[] {
+export function createTaskWarnings(payload: CanonicalCreateTaskPayloadV2): CreateTaskWarning[] {
   const warnings: CreateTaskWarning[] = [];
   if (payload.plannedDate !== null && payload.deferDate !== null) {
     if (Date.parse(payload.plannedDate) < Date.parse(payload.deferDate)) {

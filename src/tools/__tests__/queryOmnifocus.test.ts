@@ -646,12 +646,14 @@ describe('generateFieldMapping - get_project raw fields', () => {
     const result = generateFieldMapping('projects', [
       'folderId',
       'containsSingletonActions',
+      'ancestorFolderDropped',
       'directTaskIds',
       'taskIds',
       'taskStatusCounts',
     ]);
     expect(result).toContain('folderId: item.parentFolder ? item.parentFolder.id.primaryKey : null');
     expect(result).toContain('containsSingletonActions: Boolean(item.containsSingletonActions)');
+    expect(result).toContain('ancestorFolderDropped: isAncestorFolderDropped(item)');
     expect(result).toContain('directTaskIds: item.tasks ? item.tasks.map');
     expect(result).toContain('taskIds: item.flattenedTasks ? item.flattenedTasks.map');
     expect(result).toContain('taskStatusCounts: (() =>');

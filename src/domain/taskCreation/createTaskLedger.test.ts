@@ -61,6 +61,26 @@ describe("create_task durable idempotency ledger", () => {
     expect(again.payloadHash).toBe("a".repeat(64));
   });
 
+  it("keeps retryable validation failures bound but nonterminal", async () => {
+    const store = ledger();
+    const keyHash = hashIdempotencyKey("retryable-key");
+    await store.withGlobalLock(async () => {
+      await store.reserve(keyHash, "a".repeat(64));
+      await store.transition(keyHash, "retryable_validation_error", {
+        resultCode: "project_validation_failed.query_failed",
+      });
+      await store.transition(keyHash, "write_started");
+      await store.transition(keyHash, "retryable_validation_error", {
+        resultCode: "project_validation_failed.ancestor_state_unknown",
+      });
+    });
+    expect(await store.read(keyHash)).toMatchObject({
+      state: "retryable_validation_error",
+      payloadHash: "a".repeat(64),
+      resultCode: "project_validation_failed.ancestor_state_unknown",
+    });
+  });
+
   it("serializes concurrent mutations with a global lock", async () => {
     const store = ledger({ lockTimeoutMs: 500 });
     let active = 0;

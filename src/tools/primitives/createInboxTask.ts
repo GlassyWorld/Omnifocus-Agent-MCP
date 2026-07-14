@@ -1,7 +1,7 @@
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { z } from "zod";
-import { CanonicalCreateTaskPayload } from "../../domain/taskCreation/createTaskSchemas.js";
+import type { CanonicalCreateTaskPayloadV2 } from "../../domain/taskCreation/createTaskSchemas.js";
 import { SafeJxaExecutor } from "../../utils/safeJxaExecutor.js";
 
 export type CreateInboxTaskResult =
@@ -36,7 +36,7 @@ function scriptPath(): string {
 }
 
 export async function createInboxTask(
-  payload: CanonicalCreateTaskPayload,
+  payload: CanonicalCreateTaskPayloadV2,
   executor: JxaJsonExecutor = new SafeJxaExecutor(),
 ): Promise<CreateInboxTaskResult> {
   try {

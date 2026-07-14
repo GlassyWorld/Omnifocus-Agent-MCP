@@ -1,5 +1,5 @@
 import { mapRawTaskToTaskView } from "../task/taskMapper.js";
-import { RawTask } from "../task/taskTypes.js";
+import type { RawTask } from "../task/taskTypes.js";
 import {
   canonicalizeCreateTaskInput,
   createTaskWarnings,
@@ -9,11 +9,21 @@ import { CreateTaskOperationError } from "./createTaskErrors.js";
 import {
   CreateTaskLedger,
   hashIdempotencyKey,
-  IdempotencyLedgerRecord,
+  type IdempotencyLedgerRecord,
 } from "./createTaskLedger.js";
-import { CreateTaskInput, CreateTaskSuccess } from "./createTaskSchemas.js";
-import { verifyCreatedInboxTask } from "./createTaskVerifier.js";
-import { CreateInboxTaskResult } from "../../tools/primitives/createInboxTask.js";
+import type {
+  CanonicalCreateTaskPayloadV2,
+  CreateTaskInput,
+  CreateTaskSuccess,
+  CreateTaskWarning,
+} from "./createTaskSchemas.js";
+import { verifyCreatedTask } from "./createTaskVerifier.js";
+import {
+  type ProjectDestinationResolution,
+  validateProjectDestination,
+} from "./projectDestination.js";
+import type { CreateInboxTaskResult } from "../../tools/primitives/createInboxTask.js";
+import type { CreateTaskInProjectResult } from "../../tools/primitives/createTaskInProject.js";
 
 export interface ExactTaskReaderResult {
   success: boolean;
@@ -21,9 +31,15 @@ export interface ExactTaskReaderResult {
   error?: string;
 }
 
+type ProjectCreatePayload = CanonicalCreateTaskPayloadV2 & {
+  destination: { kind: "project"; projectId: string };
+};
+
 export interface CreateTaskServiceDependencies {
   ledger: CreateTaskLedger;
-  createInboxTask: (payload: ReturnType<typeof canonicalizeCreateTaskInput>) => Promise<CreateInboxTaskResult>;
+  createInboxTask: (payload: CanonicalCreateTaskPayloadV2) => Promise<CreateInboxTaskResult>;
+  createTaskInProject: (payload: ProjectCreatePayload) => Promise<CreateTaskInProjectResult>;
+  resolveProjectById: (projectId: string) => Promise<ProjectDestinationResolution>;
   readTaskById: (taskId: string) => Promise<ExactTaskReaderResult>;
   now?: () => Date;
 }
@@ -44,22 +60,41 @@ export class CreateTaskService {
       const record = await this.dependencies.ledger.reserve(keyHash, payloadHash);
       if (record.payloadHash !== payloadHash) {
         throw this.error("idempotency_conflict", "The idempotency key is already bound to a different semantic payload.", {
-          mayHaveWritten: record.state !== "reserved" && record.state !== "terminal_prewrite_error",
+          mayHaveWritten: !["reserved", "retryable_validation_error", "terminal_prewrite_error"].includes(record.state),
           taskId: record.taskId,
           idempotencyKey: effectiveKey,
         });
       }
-      if (record.state !== "reserved") {
+      if (record.state !== "reserved" && record.state !== "retryable_validation_error") {
         return this.handleExisting(record, canonical, effectiveKey);
       }
 
+      if (canonical.destination.kind === "project") {
+        const resolution = await this.safeResolveProjectById(canonical.destination.projectId);
+        const validation = validateProjectDestination(canonical.destination.projectId, resolution);
+        if (!validation.allowed) {
+          await this.dependencies.ledger.transition(
+            keyHash,
+            validation.retrySafe ? "retryable_validation_error" : "terminal_prewrite_error",
+            { resultCode: `${validation.code}.${validation.reason}` },
+          );
+          throw this.error(validation.code, "The requested Project destination could not be validated for creation.", {
+            mayHaveWritten: false,
+            idempotencyKey: effectiveKey,
+            reason: validation.reason,
+          }, validation.retrySafe);
+        }
+      }
+
       await this.dependencies.ledger.transition(keyHash, "write_started");
-      let primitive: CreateInboxTaskResult;
+      let primitive: CreateInboxTaskResult | CreateTaskInProjectResult;
       try {
-        primitive = await this.dependencies.createInboxTask(canonical);
+        primitive = canonical.destination.kind === "inbox"
+          ? await this.dependencies.createInboxTask(canonical)
+          : await this.dependencies.createTaskInProject(canonical as ProjectCreatePayload);
       } catch (error) {
         await this.dependencies.ledger.transition(keyHash, "outcome_unknown", {
-          resultCode: "verification_failed",
+          resultCode: "verification_failed.outcome_unknown",
         });
         if (error instanceof CreateTaskOperationError) {
           throw this.error("verification_failed", error.message, {
@@ -77,12 +112,35 @@ export class CreateTaskService {
 
       if (!primitive.success) {
         if (primitive.phase === "prewrite") {
+          const projectFailure = canonical.destination.kind === "project"
+            ? primitive as Exclude<CreateTaskInProjectResult, { success: true }>
+            : null;
+          if (
+            projectFailure !== null
+            && projectFailure.errorCategory === "project_validation_failed"
+          ) {
+            await this.dependencies.ledger.transition(keyHash, "retryable_validation_error", {
+              resultCode: `project_validation_failed.${projectFailure.reason ?? "adapter_failed"}`,
+            });
+            throw this.error("project_validation_failed", "The Project could not be revalidated immediately before creation.", {
+              mayHaveWritten: false,
+              idempotencyKey: effectiveKey,
+              reason: projectFailure.reason ?? "adapter_failed",
+            }, true);
+          }
+
+          const code = projectFailure !== null
+            && (projectFailure.errorCategory === "project_not_found" || projectFailure.errorCategory === "project_not_active")
+            ? projectFailure.errorCategory
+            : "write_failed";
+          const reason = projectFailure?.reason;
           await this.dependencies.ledger.transition(keyHash, "terminal_prewrite_error", {
-            resultCode: "write_failed",
+            resultCode: reason ? `${code}.${reason}` : code,
           });
-          throw this.error("write_failed", "OmniFocus rejected the task before creation.", {
+          throw this.error(code, "OmniFocus rejected the task before creation.", {
             mayHaveWritten: false,
             idempotencyKey: effectiveKey,
+            reason,
           });
         }
         if (primitive.taskId) {
@@ -93,7 +151,7 @@ export class CreateTaskService {
           return this.verifyNewTask(keyHash, primitive.taskId, canonical, effectiveKey);
         }
         await this.dependencies.ledger.transition(keyHash, "outcome_unknown", {
-          resultCode: "verification_failed",
+          resultCode: "verification_failed.missing_task_id",
         });
         throw this.error("verification_failed", "Task creation may have occurred, but no task ID was returned.", {
           mayHaveWritten: true,
@@ -111,7 +169,7 @@ export class CreateTaskService {
 
   private async handleExisting(
     record: IdempotencyLedgerRecord,
-    canonical: ReturnType<typeof canonicalizeCreateTaskInput>,
+    canonical: CanonicalCreateTaskPayloadV2,
     effectiveKey: string,
   ): Promise<CreateTaskSuccess> {
     if (record.state === "verified") {
@@ -137,7 +195,7 @@ export class CreateTaskService {
     const mayHaveWritten = record.state === "write_started" || record.state === "outcome_unknown";
     if (record.state === "write_started") {
       await this.dependencies.ledger.transition(record.keyHash, "outcome_unknown", {
-        resultCode: "verification_failed",
+        resultCode: "verification_failed.outcome_unknown",
       });
     }
     throw this.error("duplicate_request", "The idempotency key has already been used and cannot execute another write.", {
@@ -151,7 +209,7 @@ export class CreateTaskService {
   private async verifyNewTask(
     keyHash: string,
     taskId: string,
-    canonical: ReturnType<typeof canonicalizeCreateTaskInput>,
+    canonical: CanonicalCreateTaskPayloadV2,
     effectiveKey: string,
   ): Promise<CreateTaskSuccess> {
     let task;
@@ -167,7 +225,7 @@ export class CreateTaskService {
       }
       throw error;
     }
-    const verification = verifyCreatedInboxTask(canonical, task);
+    const verification = verifyCreatedTask(canonical, task);
     if (!verification.matches) {
       const current = await this.dependencies.ledger.read(keyHash);
       if (current?.state === "task_created") {
@@ -176,12 +234,17 @@ export class CreateTaskService {
           resultCode: "partial_success",
         });
       }
-      throw this.error("partial_success", "The task exists, but its verified state differs from the request.", {
+      throw this.error("partial_success", "The task exists, but its verified placement or fields differ from the request.", {
         mayHaveWritten: true,
         taskId,
         idempotencyKey: effectiveKey,
         verificationDiff: verification.diff,
       });
+    }
+
+    const warnings = createTaskWarnings(canonical);
+    if (canonical.destination.kind === "project") {
+      warnings.push(...await this.projectStateWarnings(canonical.destination.projectId));
     }
     const replayUntil = new Date(this.now().getTime() + 24 * 60 * 60 * 1_000).toISOString();
     const current = await this.dependencies.ledger.read(keyHash);
@@ -196,17 +259,47 @@ export class CreateTaskService {
       success: true,
       created: verification.created,
       idempotency: { key: effectiveKey, replayed: false, replayUntil },
-      warnings: createTaskWarnings(canonical),
+      warnings,
     };
+  }
+
+  private async projectStateWarnings(projectId: string): Promise<CreateTaskWarning[]> {
+    const resolution = await this.safeResolveProjectById(projectId);
+    if (!resolution.success) {
+      const deterministicChange = resolution.reason === "not_found";
+      return [{
+        code: deterministicChange
+          ? "project_state_changed_after_creation"
+          : "project_state_unverified_after_creation",
+        message: deterministicChange
+          ? "The task placement was verified, but the Project changed or disappeared immediately after creation."
+          : "The task placement was verified, but the Project's current eligibility could not be revalidated.",
+      }];
+    }
+    if (resolution.project.rawStatus !== "Active" || resolution.project.ancestorFolderDropped) {
+      return [{
+        code: "project_state_changed_after_creation",
+        message: "The task placement was verified, but the Project became ineligible immediately after creation.",
+      }];
+    }
+    return [];
+  }
+
+  private async safeResolveProjectById(projectId: string): Promise<ProjectDestinationResolution> {
+    try {
+      return await this.dependencies.resolveProjectById(projectId);
+    } catch {
+      return { success: false, reason: "query_failed" };
+    }
   }
 
   private async replay(
     record: IdempotencyLedgerRecord,
-    canonical: ReturnType<typeof canonicalizeCreateTaskInput>,
+    canonical: CanonicalCreateTaskPayloadV2,
     effectiveKey: string,
   ): Promise<CreateTaskSuccess> {
     const task = await this.readOne(record.taskId!, "replay_target_unavailable", effectiveKey);
-    const verification = verifyCreatedInboxTask(canonical, task);
+    const verification = verifyCreatedTask(canonical, task);
     const warnings = createTaskWarnings(canonical);
     if (!verification.matches) {
       warnings.push({
@@ -255,7 +348,8 @@ export class CreateTaskService {
     code: ConstructorParameters<typeof CreateTaskOperationError>[0]["code"],
     message: string,
     detail: Omit<ConstructorParameters<typeof CreateTaskOperationError>[0], "code" | "message" | "retrySafe">,
+    retrySafe = false,
   ): CreateTaskOperationError {
-    return new CreateTaskOperationError({ code, message, retrySafe: false, ...detail });
+    return new CreateTaskOperationError({ code, message, retrySafe, ...detail });
   }
 }

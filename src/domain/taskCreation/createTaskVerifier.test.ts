@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { TaskView } from "../task/taskTypes.js";
-import { CanonicalCreateTaskPayload } from "./createTaskSchemas.js";
-import { verifyCreatedInboxTask } from "./createTaskVerifier.js";
+import type { TaskView } from "../task/taskTypes.js";
+import type { CanonicalCreateTaskPayloadV2 } from "./createTaskSchemas.js";
+import { verifyCreatedTask } from "./createTaskVerifier.js";
 
-const expected: CanonicalCreateTaskPayload = {
+const expected: CanonicalCreateTaskPayloadV2 = {
   name: "Task",
   note: "Note",
   plannedDate: "2026-07-14T07:00:00.000Z",
@@ -11,6 +11,7 @@ const expected: CanonicalCreateTaskPayload = {
   deferDate: null,
   flagged: false,
   estimatedMinutes: null,
+  destination: { kind: "inbox" },
 };
 
 const actual: TaskView = {
@@ -39,28 +40,36 @@ const actual: TaskView = {
 };
 
 describe("create_task exact verifier", () => {
-  it("uses canonical state, direct dates, and a one-second tolerance", () => {
-    const result = verifyCreatedInboxTask(expected, actual);
+  it("verifies Inbox placement, canonical fields, and direct dates", () => {
+    const result = verifyCreatedTask(expected, actual);
     expect(result.matches).toBe(true);
-    expect(result.created).toEqual({
-      id: "task-1",
-      name: "Task",
-      note: "Note",
-      location: { kind: "inbox" },
-      plannedDate: "2026-07-14T07:00:00.900Z",
-      dueDate: null,
-      deferDate: null,
-      flagged: false,
-      estimatedMinutes: null,
-    });
+    expect(result.created.location).toEqual({ kind: "inbox" });
+    expect(result.created.plannedDate).toBe("2026-07-14T07:00:00.900Z");
   });
 
   it("does not fail when a tag appears concurrently", () => {
-    expect(verifyCreatedInboxTask(expected, actual).diff).not.toHaveProperty("tags");
+    expect(verifyCreatedTask(expected, actual).diff).not.toHaveProperty("tags");
+  });
+
+  it("verifies exact Project placement independently of current Project status", () => {
+    const result = verifyCreatedTask(
+      { ...expected, destination: { kind: "project", projectId: "project-1" } },
+      {
+        ...actual,
+        location: { inInbox: false },
+        project: { id: "project-1", name: "Project" },
+      },
+    );
+    expect(result.matches).toBe(true);
+    expect(result.created.location).toEqual({
+      kind: "project",
+      projectId: "project-1",
+      projectName: "Project",
+    });
   });
 
   it("reports placement and property mismatches", () => {
-    const result = verifyCreatedInboxTask(expected, {
+    const result = verifyCreatedTask(expected, {
       ...actual,
       name: "Changed",
       location: { inInbox: false },

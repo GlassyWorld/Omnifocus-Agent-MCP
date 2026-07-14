@@ -1,6 +1,6 @@
 import { TaskView } from "../task/taskTypes.js";
 import {
-  CanonicalCreateTaskPayload,
+  CanonicalCreateTaskPayloadV2,
   CreatedTaskView,
 } from "./createTaskSchemas.js";
 
@@ -19,8 +19,8 @@ function datesMatch(expected: string | null, actual: string | null): boolean {
   return Math.abs(Date.parse(expected) - Date.parse(actual)) <= 1_000;
 }
 
-export function verifyCreatedInboxTask(
-  expected: CanonicalCreateTaskPayload,
+export function verifyCreatedTask(
+  expected: CanonicalCreateTaskPayloadV2,
   actual: TaskView,
 ): CreateTaskVerificationResult {
   const diff: Record<string, { expected: unknown; actual: unknown }> = {};
@@ -33,8 +33,13 @@ export function verifyCreatedInboxTask(
   compare("name", expected.name, actual.name);
   compare("note", expected.note, actual.note);
   compare("kind", "action", actual.kind);
-  compare("location.inInbox", true, actual.location.inInbox);
-  compare("project", null, actual.project);
+  if (expected.destination.kind === "inbox") {
+    compare("location.inInbox", true, actual.location.inInbox);
+    compare("project", null, actual.project);
+  } else {
+    compare("location.inInbox", false, actual.location.inInbox);
+    compare("project.id", expected.destination.projectId, actual.project?.id ?? null);
+  }
   compare("hierarchy.parentId", null, actual.hierarchy.parentId);
   compare("flagged", expected.flagged, actual.status.flagged.direct);
   compare("estimatedMinutes", expected.estimatedMinutes, actual.estimate.minutes);
@@ -60,7 +65,13 @@ export function verifyCreatedInboxTask(
       id: actual.id,
       name: actual.name,
       note: actual.note,
-      location: { kind: "inbox" },
+      location: actual.project === null
+        ? { kind: "inbox" }
+        : {
+            kind: "project",
+            projectId: actual.project.id,
+            projectName: actual.project.name,
+          },
       plannedDate: normalizedInstant(actual.dates.planned.direct),
       dueDate: normalizedInstant(actual.dates.due.direct),
       deferDate: normalizedInstant(actual.dates.defer.direct),
