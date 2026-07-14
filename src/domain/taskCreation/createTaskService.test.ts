@@ -122,7 +122,13 @@ describe("CreateTaskService", () => {
     const harness = createHarness({
       readResult: {
         success: true,
-        tasks: [{ ...rawTask, inInbox: false, projectId: "project-1", projectName: "Project" }],
+        tasks: [{
+          ...rawTask,
+          inInbox: false,
+          projectId: "project-1",
+          projectName: "Project",
+          parentId: "project-1",
+        }],
       },
     });
     const projectInput: CreateTaskInput = {
@@ -200,7 +206,13 @@ describe("CreateTaskService", () => {
     harness.resolveProjectById.mockResolvedValue(activeProject);
     harness.readTaskById.mockResolvedValue({
       success: true,
-      tasks: [{ ...rawTask, inInbox: false, projectId: "project-1", projectName: "Project" }],
+      tasks: [{
+        ...rawTask,
+        inInbox: false,
+        projectId: "project-1",
+        projectName: "Project",
+        parentId: "project-1",
+      }],
     });
     const result = await harness.service.execute(projectInput, key);
     expect(result.success).toBe(true);
@@ -211,7 +223,13 @@ describe("CreateTaskService", () => {
     const harness = createHarness({
       readResult: {
         success: true,
-        tasks: [{ ...rawTask, inInbox: false, projectId: "project-1", projectName: "Project" }],
+        tasks: [{
+          ...rawTask,
+          inInbox: false,
+          projectId: "project-1",
+          projectName: "Project",
+          parentId: "project-1",
+        }],
       },
     });
     harness.createTaskInProject
@@ -273,11 +291,50 @@ describe("CreateTaskService", () => {
     });
   });
 
+  it.each([
+    ["null parent", null, "project-1"],
+    ["ordinary Task parent", "ordinary-task-1", "project-1"],
+    ["mismatched Project context", "project-1", "other-project"],
+  ] as const)("returns partial_success for Project top-level mismatch: %s", async (
+    _label,
+    parentId,
+    actualProjectId,
+  ) => {
+    const harness = createHarness({
+      readResult: {
+        success: true,
+        tasks: [{
+          ...rawTask,
+          inInbox: false,
+          projectId: actualProjectId,
+          projectName: "Project",
+          parentId,
+        }],
+      },
+    });
+    await expect(harness.service.execute({
+      ...input,
+      destination: { kind: "project", projectId: "project-1" },
+    }, key)).rejects.toMatchObject<CreateTaskOperationError>({
+      detail: {
+        code: "partial_success",
+        taskId: "task-1",
+        mayHaveWritten: true,
+      },
+    });
+  });
+
   it("returns success with a warning if Project state changes after exact placement", async () => {
     const harness = createHarness({
       readResult: {
         success: true,
-        tasks: [{ ...rawTask, inInbox: false, projectId: "project-1", projectName: "Project" }],
+        tasks: [{
+          ...rawTask,
+          inInbox: false,
+          projectId: "project-1",
+          projectName: "Project",
+          parentId: "project-1",
+        }],
       },
     });
     harness.resolveProjectById
@@ -298,7 +355,13 @@ describe("CreateTaskService", () => {
     const harness = createHarness({
       readResult: {
         success: true,
-        tasks: [{ ...rawTask, inInbox: false, projectId: "project-1", projectName: "Project" }],
+        tasks: [{
+          ...rawTask,
+          inInbox: false,
+          projectId: "project-1",
+          projectName: "Project",
+          parentId: "project-1",
+        }],
       },
     });
     harness.resolveProjectById

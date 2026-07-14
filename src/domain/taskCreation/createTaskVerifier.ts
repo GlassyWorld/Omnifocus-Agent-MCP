@@ -3,6 +3,7 @@ import {
   CanonicalCreateTaskPayloadV2,
   CreatedTaskView,
 } from "./createTaskSchemas.js";
+import { isTopLevelTaskInProject } from "./taskPlacementSemantics.js";
 
 export interface CreateTaskVerificationResult {
   matches: boolean;
@@ -36,11 +37,18 @@ export function verifyCreatedTask(
   if (expected.destination.kind === "inbox") {
     compare("location.inInbox", true, actual.location.inInbox);
     compare("project", null, actual.project);
+    compare("hierarchy.parentId", null, actual.hierarchy.parentId);
   } else {
-    compare("location.inInbox", false, actual.location.inInbox);
-    compare("project.id", expected.destination.projectId, actual.project?.id ?? null);
+    if (!isTopLevelTaskInProject(actual, expected.destination.projectId)) {
+      compare("location.inInbox", false, actual.location.inInbox);
+      compare("project.id", expected.destination.projectId, actual.project?.id ?? null);
+      compare(
+        "hierarchy.parentId",
+        expected.destination.projectId,
+        actual.hierarchy.parentId,
+      );
+    }
   }
-  compare("hierarchy.parentId", null, actual.hierarchy.parentId);
   compare("flagged", expected.flagged, actual.status.flagged.direct);
   compare("estimatedMinutes", expected.estimatedMinutes, actual.estimate.minutes);
 

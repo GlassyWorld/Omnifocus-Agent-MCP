@@ -5,6 +5,13 @@
 > 范围：受控创建一个 Inbox Task<br>
 > 基线 commit：`f79ae21da7f90fa39e45022c360b1a487d0f76bd`（2026-07-13 审查）
 
+> Phase 2 amendment（2026-07-14，已接受）：隔离 Project Canary 证明 OmniFocus
+> 读侧以 Project root Task ID 同时作为 canonical Project ID 和 Project 顶层 action
+> 的 `hierarchy.parentId`。因此 Phase 2B 顶层 Project placement 验证要求
+> `actual.project.id === requestedProjectId` 且
+> `actual.hierarchy.parentId === requestedProjectId`。这不授权 Phase 4 的普通
+> parent Task placement。
+
 ## 1. 决策摘要
 
 `create_task` V1 是一个单阶段、Inbox-only、显式授权、带持久化幂等保护和写后精确读取的 mutation Tool。
@@ -920,7 +927,7 @@ Retry-key 验收必须提供可观察证据，但不能记录任务内容。hand
 - 能力：read-before-write、单个 canonical Project ID、服务端实时验证、Active-only；
 - 风险：Project 在发现与写入间被删除、改为 On Hold/Completed/Dropped；
 - 前置：Phase 1 Production Acceptance 与 Phase 2A 评审通过；
-- 验收：actual project ID 精确一致、parentId null、无名称 mutation、无猜 ID、无同名首选、无 Inbox fallback；
+- 验收：actual project ID 与 parentId 均精确等于 requested canonical Project root Task ID、无名称 mutation、无猜 ID、无同名首选、无 Inbox fallback；
 - Project status/identity 变化时拒绝创建，不回落 Inbox；
 - 不包含：parent、Tag、batch、repeat、notification。
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskView } from "../task/taskTypes.js";
 import type { CanonicalCreateTaskPayloadV2 } from "./createTaskSchemas.js";
 import { verifyCreatedTask } from "./createTaskVerifier.js";
+import { isTopLevelTaskInProject } from "./taskPlacementSemantics.js";
 
 const expected: CanonicalCreateTaskPayloadV2 = {
   name: "Task",
@@ -58,6 +59,7 @@ describe("create_task exact verifier", () => {
         ...actual,
         location: { inInbox: false },
         project: { id: "project-1", name: "Project" },
+        hierarchy: { ...actual.hierarchy, parentId: "project-1" },
       },
     );
     expect(result.matches).toBe(true);
@@ -66,6 +68,46 @@ describe("create_task exact verifier", () => {
       projectId: "project-1",
       projectName: "Project",
     });
+  });
+
+  it.each([
+    [null, "project-1"],
+    ["ordinary-task-1", "project-1"],
+    ["project-1", "other-project"],
+  ] as const)(
+    "rejects inconsistent Project top-level placement parent=%s project=%s",
+    (parentId, actualProjectId) => {
+      const result = verifyCreatedTask(
+        { ...expected, destination: { kind: "project", projectId: "project-1" } },
+        {
+          ...actual,
+          location: { inInbox: false },
+          project: { id: actualProjectId, name: "Project" },
+          hierarchy: { ...actual.hierarchy, parentId },
+        },
+      );
+      expect(result.matches).toBe(false);
+      expect(result.diff).toEqual(expect.objectContaining(
+        parentId === "project-1"
+          ? { "project.id": expect.any(Object) }
+          : { "hierarchy.parentId": expect.any(Object) },
+      ));
+    },
+  );
+
+  it("does not treat an ordinary parent Task as Project top-level placement", () => {
+    const topLevel = {
+      ...actual,
+      location: { inInbox: false },
+      project: { id: "project-1", name: "Project" },
+      hierarchy: { ...actual.hierarchy, parentId: "project-1" },
+    };
+    const childTask = {
+      ...topLevel,
+      hierarchy: { ...topLevel.hierarchy, parentId: "ordinary-task-1" },
+    };
+    expect(isTopLevelTaskInProject(topLevel, "project-1")).toBe(true);
+    expect(isTopLevelTaskInProject(childTask, "project-1")).toBe(false);
   });
 
   it("reports placement and property mismatches", () => {
