@@ -18,6 +18,7 @@ import * as getTaskTool from "./tools/definitions/getTask.js";
 import * as getProjectTool from "./tools/definitions/getProject.js";
 import * as getCompletedSinceTool from "./tools/definitions/getCompletedSince.js";
 import * as getLeanSnapshotTool from "./tools/definitions/getLeanSnapshot.js";
+import * as searchTagsTool from "./tools/definitions/searchTags.js";
 import * as listPerspectivesTool from "./tools/definitions/listPerspectives.js";
 import * as getPerspectiveViewTool from "./tools/definitions/getPerspectiveView.js";
 import * as listTagsTool from "./tools/definitions/listTags.js";
@@ -140,6 +141,12 @@ export const TOOL_REGISTRY: readonly ToolRegistration[] = [
     description: "Read-only. Return a capped all-system current-state OmniFocus snapshot containing active project summaries, factual attention signals, and Inbox task summaries. Waiting, recent completion history, health, risk, priority, and recommendations are not inferred.",
     tool: getLeanSnapshotTool,
     profiles: ["personal-production", "upstream-full"],
+  },
+  {
+    name: "search_tags",
+    description: "Read-only. Search existing OmniFocus Tags with canonical IDs, exact native status, full hierarchy paths, and mutual-exclusion facts. Defaults to Active Tags. Use full paths to distinguish same-name Tags. Results are discovery facts, not write authorization, and this Tool never creates Tags.",
+    tool: searchTagsTool,
+    profiles: ["personal-production"],
   },
   {
     name: "create_task",

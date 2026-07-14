@@ -17,6 +17,7 @@ const EXPECTED_PRODUCTION_TOOLS = [
   "get_project",
   "get_task",
   "get_completed_since",
+  "search_tags",
 ].sort();
 
 const EXPECTED_FULL_TOOLS = [
@@ -38,7 +39,7 @@ const EXPECTED_FULL_TOOLS = [
   "create_tag",
 ].sort();
 
-const EXPECTED_ALL_TOOLS = [...EXPECTED_FULL_TOOLS, "create_task"].sort();
+const EXPECTED_ALL_TOOLS = [...EXPECTED_FULL_TOOLS, "create_task", "search_tags"].sort();
 
 type RegistrationRecorder = {
   toolNames: string[];
@@ -114,7 +115,45 @@ describe("profile-specific server registration", () => {
     }
   });
 
-  it("registers exactly four Domain reads plus the write-disabled-capable create_task and no resources for personal-production", () => {
+  it("publishes the complete strict search_tags Schema and read metadata convention over MCP", async () => {
+    const server = new McpServer({ name: "tag-schema-test-server", version: "1.0.0" });
+    const client = new Client({ name: "tag-schema-test-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    registerToolsForProfile(server, "personal-production");
+
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      const listed = await client.listTools();
+      const searchTags = listed.tools.find(tool => tool.name === "search_tags");
+
+      expect(searchTags?.annotations).toBeUndefined();
+      expect(searchTags?.inputSchema).toMatchObject({
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          query: { type: "string", minLength: 1, maxLength: 200 },
+          status: {
+            type: "array",
+            minItems: 1,
+            maxItems: 3,
+            items: { type: "string", enum: ["active", "on_hold", "dropped"] },
+          },
+          limit: { type: "integer", minimum: 1, maximum: 100 },
+        },
+      });
+      expect(searchTags?.outputSchema).toMatchObject({
+        type: "object",
+        additionalProperties: false,
+        required: ["success", "tags", "page"],
+      });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("registers exactly five reads plus the write-disabled-capable create_task and no resources for personal-production", () => {
     const recorder = createRegistrationRecorder();
 
     registerToolsForProfile(recorder.server, "personal-production");
@@ -129,6 +168,7 @@ describe("profile-specific server registration", () => {
       get_project: "project",
       get_completed_since: "completed",
       get_lean_snapshot: "snapshot",
+      search_tags: "tags",
       create_task: "created",
     };
     for (const [toolName, payloadField] of Object.entries(expectedEnvelopeFields)) {
@@ -144,6 +184,7 @@ describe("profile-specific server registration", () => {
       openWorldHint: false,
       idempotentHint: true,
     });
+    expect(recorder.toolConfigs.get("search_tags")?.annotations).toBeUndefined();
     const createInputSchema = recorder.toolConfigs.get("create_task")?.inputSchema as ZodTypeAny;
     expect(createInputSchema.safeParse({ name: "Task" }).success).toBe(false);
     expect(createInputSchema.safeParse({
@@ -181,7 +222,9 @@ describe("profile-specific server registration", () => {
     expect(recorder.toolNames).toContain("add_omnifocus_task");
     expect(recorder.toolNames).not.toContain("create_task");
 
-    for (const toolName of EXPECTED_PRODUCTION_TOOLS.filter(name => name !== "create_task")) {
+    for (const toolName of EXPECTED_PRODUCTION_TOOLS.filter(
+      name => name !== "create_task" && name !== "search_tags",
+    )) {
       const fullOutputSchema = recorder.toolConfigs.get(toolName)?.outputSchema;
       const productionOutputSchema = productionRecorder.toolConfigs.get(toolName)?.outputSchema;
       expect(fullOutputSchema).toBeDefined();

@@ -1,18 +1,19 @@
-# create_task V1/V2 Status
+# create_task V2 Status
 
 ## 当前事实
 
 - [ADR-006](../../architecture/decisions/ADR-006-controlled-create-task-v1.md) 已接受 Inbox-only `create_task` V1 架构和 Phase 2/4 演进边界。
 - Phase 1 已实现 strict contract、semantic canonicalization、永久 tombstone Ledger、global mutation lock、safe no-shell JXA executor、Inbox-only primitive、exact Task readback verifier、compact handler 及 deterministic tests。
-- `create_task` 已加入 `personal-production`；Profile 代码表面为四个 read Tool 加一个受 feature flag 保护的创建 Tool。corrected Schema Refresh/禁写门禁通过后，Checkpoint 7 已正式恢复生产 LaunchAgent flag=`true`。
+- `create_task` 已加入 `personal-production`；当前 Profile 代码表面为五个 read Tool 加一个受 feature flag 保护的创建 Tool。corrected Schema Refresh/禁写门禁通过后，Checkpoint 7 已正式恢复生产 LaunchAgent flag=`true`。
 - `upstream-full` 已有 `add_omnifocus_task` mutation tool，但它不是自动成立的未来 V1 契约。
-- `list_tags` 和 `create_tag` 只在 `upstream-full` 注册；个人 Profile 中没有 Tag Tool。
+- legacy `list_tags` 和 `create_tag` 只在 `upstream-full` 注册；个人 Profile 只增加只读 `search_tags`，没有 Tag mutation Tool。
 - ADR-005 要求分析与写入分离，并把授权、确认、审计、失败/回滚和重复保护作为 mutation gateway 的复审条件。
 - Phase 2A Project placement 设计已通过评审；Phase 2B 实现、禁写客户端门禁、隔离生产 Canary、人工清理和 fail-closed 正式启用均已通过。公开 Project-specific flag 已加载为 `true`。
+- Phase T1 既有 Tag 结构化发现设计、实现、protocol/capability、真实只读和 T1-D 生产注册验收已全部通过；`search_tags` 已进入个人 Profile，生产为精确六 Tool、Resources absent。
 
 ## 当前判断
 
-V1 已完成 corrected Schema 的正式生产部署与 Checkpoint 7 全部验收。只有 `OMNIFOCUS_CREATE_TASK_ENABLED=true` 才能进入 Ledger/mutation service；当前生产值为 `true`，缺失、空值或其他值仍会在 Ledger/lock/JXA 前返回 `write_disabled`。
+Phase 1 已完成 corrected Schema 的正式生产部署与 Checkpoint 7 全部验收；Phase 2B Project placement 随后形成当前 V2。只有 `OMNIFOCUS_CREATE_TASK_ENABLED=true` 才能进入 Ledger/mutation service；当前生产值为 `true`，缺失、空值或其他值仍会在 Ledger/lock/JXA 前返回 `write_disabled`。
 
 Checkpoint 6A 已部署并通过本地 MCP 协议验收：精确五 Tool、零 Resources、固定 `write_disabled`、禁写对象 `not_found`、Ledger 目录未创建、health/ready 正常。用户已确认 ChatGPT App Refresh 和禁写 UI 测试完成。
 
@@ -35,6 +36,8 @@ Refresh 后 Web 自动 UUID 禁写门禁已通过：单次调用返回 `write_di
 2026-07-14 Phase 2B：V2 要求显式 `destination`，并以 exact canonical Project ID 支持受独立 flag 保护的 Active Project 顶层 placement。首次隔离 Canary 因真实读侧 `parentId` 等于 Project root Task ID 而安全返回 `partial_success`，未重试；修订 ADR/verifier 后，第二次单调用 Canary 成功，`project.id` 与 `parentId` 均精确等于 requested Project root ID。用户人工删除后，ID/name 双 `not_found`、Ledger `verified/success`、audit/权限/无锁均通过。详见 [Phase 2B Project Placement Acceptance](./PHASE2B_PROJECT_PLACEMENT_ACCEPTANCE.md)。
 
 用户随后独立批准正式启用。fail-closed reload 后，plist 与 loaded LaunchAgent 的 global/Project flags 均为 `true`；Tunnel 状态健康、health/ready 与 watchdog 通过，协议表面仍为精确五 Tool、Resources capability absent。配置启用与终检未创建任何 Task。
+
+2026-07-14 Phase T1：`search_tags` 已完成 strict structured contract、单次完整 snapshot、三态/path/exclusivity Adapter、privacy-safe no-shell executor、deterministic tests、真实只读和 T1-D 注册部署。当前 26 个 Tag 均完成 canonical ID roundtrip；生产精确六 Tool、Resources absent。App Refresh 与 Tag-create 负向路由在 global fail-closed 下通过，模型未丢弃 Tag 要求，真实库 exact-name 为 `not_found`；global/Project flags 已恢复为 `true/true`。详见 [Phase T1 Tag Discovery Acceptance](./PHASE_T1_TAG_DISCOVERY_ACCEPTANCE.md)。
 
 ## 当前生产边界
 

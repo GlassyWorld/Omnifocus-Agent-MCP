@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { getServerInstructions } from "./serverInstructions.js";
 
 describe("getServerInstructions", () => {
-  it("front-loads the personal-production capability boundary and all five tool routes", () => {
+  it("front-loads the personal-production capability boundary and all six tool routes", () => {
     const instructions = getServerInstructions("personal-production");
-    const opening = instructions.slice(0, 768);
+    const opening = instructions.slice(0, 1024);
 
     expect(opening).toContain("curated personal production profile");
     expect(opening).toContain("server-side tool registration");
@@ -16,6 +16,7 @@ describe("getServerInstructions", () => {
       "get_project",
       "get_task",
       "get_completed_since",
+      "search_tags",
       "create_task",
     ]) {
       expect(opening).toContain(toolName);
@@ -80,6 +81,10 @@ describe("getServerInstructions", () => {
     expect(instructions).toContain("Project name plus the available Folder");
     expect(instructions).toContain("A prior get_project call alone is insufficient");
     expect(instructions).toContain("separately accepted prepare/commit flow");
+    expect(instructions).toContain("never silently create an untagged Task");
+    expect(instructions).toContain("Tag assignment is not yet writable");
+    expect(instructions).toContain("full root-to-self path segments");
+    expect(instructions).toContain("If truncated=true");
   });
 
   it("keeps full-profile guidance and requires explicit write authorization", () => {

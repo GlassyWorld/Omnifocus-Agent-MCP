@@ -58,11 +58,12 @@ get_lean_snapshot
 get_project
 get_task
 get_completed_since
+search_tags
 create_task
 ```
 
-前四个是 Domain read tools；`create_task` 是唯一允许进入 `personal-production` 的 mutation，
-仅支持用户明确授权的单个 Inbox Task 创建。当前 surface 精确为五个 Tool、零 Resources，
+前五个是 read tools；`create_task` 是唯一允许进入 `personal-production` 的 mutation，
+仅支持用户明确授权的单个 Inbox 或 exact Active Project Task 创建，且不支持 Tag assignment。当前 surface 精确为六个 Tool、零 Resources，
 不得从 `create_task` 推断任何其他写能力。
 
 ---
@@ -410,7 +411,7 @@ tunnel-client run \
 - 有清晰的 GPT 路由场景。
 
 mutation Tool 不得沿用读取 Tool 的普通发布流程。当前唯一例外是已由 ADR-006 和完整生产验收
-限定的 `create_task` V1。任何新增 mutation 都必须先有独立 Accepted ADR，并满足显式授权、
+限定的 `create_task` V2（Phase 1 Inbox + Phase 2B Project placement）。任何新增 mutation 都必须先有独立 Accepted ADR，并满足显式授权、
 有限 mutation set、审计、失败处理和幂等保护要求。
 
 以下能力不得直接加入 `personal-production`：
