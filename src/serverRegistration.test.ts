@@ -102,6 +102,7 @@ describe("profile-specific server registration", () => {
         "name",
         "note",
         "plannedDate",
+        "tagIds",
       ]);
       expect(createTask?.inputSchema.required?.slice().sort()).toEqual([
         "destination",
@@ -109,6 +110,37 @@ describe("profile-specific server registration", () => {
         "name",
       ]);
       expect(createTask?.inputSchema.additionalProperties).toBe(false);
+      expect(createTask?.inputSchema.properties?.tagIds).toMatchObject({
+        type: "array",
+        minItems: 1,
+        maxItems: 5,
+      });
+      expect(createTask?.inputSchema.properties?.tagIds?.items).toEqual({
+        $ref: "#/properties/destination/anyOf/1/properties/projectId",
+      });
+      expect(createTask?.inputSchema.properties?.tagIds?.description).toContain(
+        "existing OmniFocus Tags",
+      );
+      expect(createTask?.outputSchema).toMatchObject({
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          created: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              tagIds: {
+                type: "array",
+                minItems: 1,
+                maxItems: 5,
+              },
+            },
+          },
+        },
+      });
+      expect(createTask?.description).toContain("existing Active Tags");
+      expect(createTask?.description).toContain("canonical IDs");
+      expect(createTask?.description).toContain("never creates Tags");
     } finally {
       await client.close();
       await server.close();
@@ -191,6 +223,7 @@ describe("profile-specific server registration", () => {
       name: "Task",
       destination: { kind: "inbox" },
       idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+      tagIds: ["tag-1"],
     }).success).toBe(true);
     expect(createInputSchema.safeParse({ name: "Task", destination: { kind: "inbox" } }).success).toBe(false);
     expect(createInputSchema.safeParse({

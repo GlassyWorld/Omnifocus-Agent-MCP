@@ -81,8 +81,13 @@ describe("getServerInstructions", () => {
     expect(instructions).toContain("Project name plus the available Folder");
     expect(instructions).toContain("A prior get_project call alone is insufficient");
     expect(instructions).toContain("separately accepted prepare/commit flow");
-    expect(instructions).toContain("never silently create an untagged Task");
-    expect(instructions).toContain("Tag assignment is not yet writable");
+    expect(instructions).toContain("do not silently omit tagIds or create an untagged Task");
+    expect(instructions).toContain("1-5 unique canonical IDs");
+    expect(instructions).toContain("complete ancestor chains are Active");
+    expect(instructions).toContain("full Tag path immediately before create_task");
+    expect(instructions).toContain("never use a name/path resolver");
+    expect(instructions).toContain("never automatically create a missing Tag");
+    expect(instructions).toContain("tag_assignment_disabled");
     expect(instructions).toContain("full root-to-self path segments");
     expect(instructions).toContain("If truncated=true");
   });

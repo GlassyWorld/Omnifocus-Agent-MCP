@@ -8,25 +8,39 @@ import { CreateTaskLedger } from "../../domain/taskCreation/createTaskLedger.js"
 import { CreateTaskService } from "../../domain/taskCreation/createTaskService.js";
 import {
   createTaskInputSchema,
-  createTaskPublicInputShape,
-  createTaskOutputSchema,
   createTaskSuccessSchema,
 } from "../../domain/taskCreation/createTaskSchemas.js";
+import { CreateTaggedTaskService } from "../../domain/taskCreation/createTaggedTaskService.js";
+import {
+  createTaskInputSchemaV3,
+  createTaskOutputSchemaV3,
+  createTaskPublicInputShapeV3,
+  hasTagAssignment,
+  taggedCreateTaskSuccessSchema,
+  type CreateTaskInputV3,
+  type TaggedCreateTaskSuccess,
+} from "../../domain/taskCreation/createTaskTagSchemas.js";
 import { createInboxTask } from "../primitives/createInboxTask.js";
 import { createTaskInProject } from "../primitives/createTaskInProject.js";
 import { getTask } from "../primitives/getTask.js";
+import { createTaggedTask } from "../primitives/createTaggedTask.js";
+import { readCreatedTaskForVerification } from "../primitives/readCreatedTaskForVerification.js";
 import { isCreateTaskMutationEnabled } from "../../config/createTaskFeatureFlag.js";
 import { isCreateTaskProjectPlacementEnabled } from "../../config/createTaskProjectFeatureFlag.js";
-import { canonicalizeCreateTaskInput } from "../../domain/taskCreation/createTaskCanonicalizer.js";
+import { isCreateTaskTagAssignmentEnabled } from "../../config/createTaskTagsFeatureFlag.js";
+import {
+  canonicalizeCreateTaskInput,
+  canonicalizeTaggedCreateTaskInput,
+} from "../../domain/taskCreation/createTaskCanonicalizer.js";
 import { hashIdempotencyKey } from "../../domain/taskCreation/createTaskLedger.js";
 import { resolveProjectById } from "../../domain/taskCreation/projectDestination.js";
 
 // MCP SDK 1.29 serializes refined/effects schemas as an empty JSON Schema.
 // Register a strict ZodObject so clients receive the complete properties and
 // required list; the handler still runs the full relation-aware parser.
-export const schema = z.object(createTaskPublicInputShape).strict();
+export const schema = z.object(createTaskPublicInputShapeV3).strict();
 export const inputSchema = schema;
-export const outputSchema = createTaskOutputSchema;
+export const outputSchema = createTaskOutputSchemaV3;
 export const annotations = {
   readOnlyHint: false,
   destructiveHint: false,
@@ -35,7 +49,10 @@ export const annotations = {
 } as const;
 
 export interface CreateTaskHandlerService {
-  execute(input: z.infer<typeof createTaskInputSchema>, effectiveKey: string): Promise<z.infer<typeof createTaskSuccessSchema>>;
+  execute(
+    input: CreateTaskInputV3,
+    effectiveKey: string,
+  ): Promise<z.infer<typeof createTaskSuccessSchema> | TaggedCreateTaskSuccess>;
 }
 
 export interface CreateTaskCanaryAuditRecord {
@@ -70,15 +87,30 @@ function createFileCanaryAuditSink(filePath: string): CreateTaskCanaryAuditSink 
 const defaultAuditSink = createFileCanaryAuditSink(defaultAuditPath);
 
 function defaultService(): CreateTaskHandlerService {
-  return new CreateTaskService({
-    ledger: new CreateTaskLedger({
-      stateDirectory: join(homedir(), "Library", "Application Support", "OmniFocus-MCP", "create-task-v1"),
-    }),
+  const ledger = new CreateTaskLedger({
+    stateDirectory: join(homedir(), "Library", "Application Support", "OmniFocus-MCP", "create-task-v1"),
+  });
+  const noTagService = new CreateTaskService({
+    ledger,
     createInboxTask,
     createTaskInProject,
     resolveProjectById,
     readTaskById: taskId => getTask({ id: taskId }),
   });
+  const taggedService = new CreateTaggedTaskService({
+    ledger,
+    createTaggedTask,
+    resolveProjectById,
+    readCreatedTaskForVerification,
+  });
+  return {
+    execute(input, effectiveKey) {
+      if (hasTagAssignment(input)) {
+        return taggedService.execute(input, effectiveKey);
+      }
+      return noTagService.execute(createTaskInputSchema.parse(input), effectiveKey);
+    },
+  };
 }
 
 function resolveEffectiveKey(
@@ -101,11 +133,11 @@ export async function handler(
   auditSink: CreateTaskCanaryAuditSink = defaultAuditSink,
 ) {
   const startedAt = Date.now();
-  const parsed = createTaskInputSchema.safeParse(args);
+  const parsed = createTaskInputSchemaV3.safeParse(args);
   if (!parsed.success) {
     return errorResponse(new CreateTaskOperationError({
       code: "invalid_arguments",
-      message: "The create_task arguments do not satisfy the strict V2 contract.",
+      message: "The create_task arguments do not satisfy the strict V3 contract.",
       mayHaveWritten: false,
       retrySafe: false,
     }));
@@ -122,7 +154,11 @@ export async function handler(
 
   // Preserve the same semantic normalization boundary in disabled and enabled
   // Canary runs without retaining or logging the payload.
-  canonicalizeCreateTaskInput(parsed.data);
+  if (hasTagAssignment(parsed.data)) {
+    canonicalizeTaggedCreateTaskInput(parsed.data);
+  } else {
+    canonicalizeCreateTaskInput(createTaskInputSchema.parse(parsed.data));
+  }
   const canaryMetadata = {
     requestMetadataHash: hashIdempotencyKey(String(extra.requestId)),
     argsIdempotencyKeyHash: hashIdempotencyKey(parsed.data.idempotencyKey!),
@@ -153,11 +189,31 @@ export async function handler(
     }));
   }
 
+  if (
+    hasTagAssignment(parsed.data)
+    && !isCreateTaskTagAssignmentEnabled(env)
+  ) {
+    emitCanaryAudit(
+      auditSink,
+      canaryMetadata,
+      "write_disabled.tag_assignment_disabled",
+      startedAt,
+    );
+    return errorResponse(new CreateTaskOperationError({
+      code: "write_disabled",
+      message: "Tag assignment is registered for canary validation but mutation is disabled.",
+      mayHaveWritten: false,
+      retrySafe: false,
+      reason: "tag_assignment_disabled",
+    }));
+  }
+
   try {
     const activeService = service ?? defaultService();
-    const result = createTaskSuccessSchema.parse(
-      await activeService.execute(parsed.data, effectiveKey),
-    );
+    const rawResult = await activeService.execute(parsed.data, effectiveKey);
+    const result = hasTagAssignment(parsed.data)
+      ? taggedCreateTaskSuccessSchema.parse(rawResult)
+      : createTaskSuccessSchema.parse(rawResult);
     emitCanaryAudit(auditSink, canaryMetadata, "success", startedAt);
     return {
       structuredContent: result,
