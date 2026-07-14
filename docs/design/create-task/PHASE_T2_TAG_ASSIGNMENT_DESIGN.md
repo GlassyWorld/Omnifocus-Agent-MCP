@@ -1,11 +1,13 @@
 # `create_task` Phase T2：既有 Active Tag ID 写入设计
 
-> 状态：第二版设计已通过评审；T2-B 未发布内部实现已获准但尚未开始（2026-07-14）<br>
-> 当前生产：`create_task` V2（Phase 1 Inbox + Phase 2B Project placement）<br>
+> 状态：T2-A/B/C/D/E 已通过；Tag assignment 已正式启用（2026-07-15）<br>
+> 当前生产：V3 build 已部署；loaded global=true、Project=true、Tag=true<br>
 > 当前 Tag 能力：Phase T1-A/B/C/D 已通过，`search_tags` 已注册到 `personal-production`<br>
 > 当前生产边界：精确六个 Tool、Resources absent，唯一 mutation 为 `create_task`<br>
 > 本文件授权：T2-B 内部 Schema/canonicalizer/fingerprint、Tag flag helper、request-closure validator、tagged primitive、mutation-only readback、tagged verifier/error mapping、确定性与零写入测试<br>
-> 本文件不授权：公开 Schema 发布、生产 handler 路由、LaunchAgent/loaded flag 变更、App Refresh、真实 mutation、Canary、正式启用或 Phase 4<br>
+> 2026-07-14 后续授权：T2-C 仓库内公开 Schema、handler gate、Instructions 与 protocol tests<br>
+> 后续授权并完成：T2-C fail-closed 部署/App Refresh/客户端验收、T2-D 两条 Canary、T2-E 正式启用<br>
+> 仍未授权：Phase 4 ordinary parent placement<br>
 > 权威边界：[ADR-006](../../architecture/decisions/ADR-006-controlled-create-task-v1.md)、[ADR-005](../../architecture/decisions/ADR-005-ai-boundary.md)、[Phase T1 Design](./PHASE_T1_TAG_DISCOVERY_DESIGN.md)、[Phase T1 Acceptance](./PHASE_T1_TAG_DISCOVERY_ACCEPTANCE.md)
 
 ## 1. 结论与本版修订
@@ -835,7 +837,7 @@ docs: revise phase t2 existing tag assignment design
 
 本阶段未改 runtime；docs-only commit/push 仍等待用户明确指令。
 
-### T2-B：未发布内部实现（已获准，等待用户开始指令）
+### T2-B：未发布内部实现（已完成并通过独立代码评审）
 
 新增 tagged parser/canonicalizer/fingerprint、Tag flag helper、request-closure validator、tagged
 primitive、dedicated readback、verifier 和 deterministic tests。
@@ -847,7 +849,7 @@ primitive、dedicated readback、verifier 和 deterministic tests。
 feat: add guarded tag assignment internals for create_task
 ```
 
-### T2-C：禁写 Schema 发布（再次独立批准）
+### T2-C：禁写 Schema 发布（已完成并通过客户端验收）
 
 切换 public V3 wire/output Schema、description、Server/App Instructions 和 protocol tests。
 
@@ -866,17 +868,27 @@ feat: publish guarded tagIds contract for create_task
 
 ### T2-D：隔离 Canary（逐条批准）
 
+第一条 tagged Inbox Canary 与第二条 tagged Project Canary 均已按独立批准完成一次创建、exact
+ID-set/ID/name/placement readback、Ledger/audit/lock、Tag projection、用户人工确认/删除与 ID/name
+双 `not_found`。Project direct/all count 已恢复到创建前值。公开 Tunnel Tag flag 始终为 false。详见
+[T2-D Canary Acceptance](./PHASE_T2_TAG_ASSIGNMENT_CANARY_ACCEPTANCE.md)。
+
 ```text
 docs: record phase t2 tag assignment canary acceptance
 ```
 
-### T2-E：正式启用（再次独立批准）
+### T2-E：正式启用（已独立批准并完成）
 
 - fail-closed reload；
 - loaded Tag flag=true；
 - 复核六 Tool、Resources absent、唯一 mutation、health/ready/watchdog；
 - 启用过程不创建 Task；
 - 是否追加公开 Canary 另行批准。
+
+实际启用采用两次受控 reload：先加载 global/Project/Tag=`false/true/true` 完成 fail-closed
+验证，再加载最终 `true/true/true`。六 Tool、Resources absent、唯一 mutation、Schema/annotations、
+health/ready/watchdog 与 Ledger/audit/lock 零写入证据均通过；未追加公开 mutation Canary。详见
+[T2-E Formal Enablement Acceptance](./PHASE_T2_TAG_ASSIGNMENT_FORMAL_ENABLEMENT_ACCEPTANCE.md)。
 
 每个 code checkpoint：
 
@@ -909,23 +921,23 @@ git status --short
 
 ### 15.2 T2-C 准入
 
-- [ ] T2-B tests/build/diff 全绿；
-- [ ] no-tag V2 canonical/hash/replay regression 全绿；
-- [ ] zero-write Base64 probe 通过；
-- [ ] public `get_task`/shared Task Domain 未扩大；
-- [ ] tagged exact-set verifier 全绿；
-- [ ] six Tool / zero Resources protocol tests 全绿；
-- [ ] Server/App Instructions 同步完成。
+- [x] T2-B tests/build/diff 全绿；
+- [x] no-tag V2 canonical/hash/replay regression 全绿；
+- [x] zero-write Base64 probe 通过；
+- [x] public `get_task`/shared Task Domain 未扩大；
+- [x] tagged exact-set verifier 全绿；
+- [x] six Tool / zero Resources protocol tests 全绿；
+- [x] Server/App Instructions 同步完成。
 
 ### 15.3 T2-D / T2-E 准入
 
-- [ ] T2-C 禁写部署、App Refresh 和负向路由通过；
-- [ ] Tag flag=false fail-closed；
-- [ ] global/Project flags 已恢复；
-- [ ] health/ready/watchdog 正常；
-- [ ] 用户单独批准每条 Canary；
-- [ ] Inbox/Project Canary 各自通过并清理；
-- [ ] 用户再次批准正式启用。
+- [x] T2-C 禁写部署、App Refresh 和负向路由通过；
+- [x] Tag flag=false fail-closed；
+- [x] global/Project flags 已恢复；
+- [x] health/ready/watchdog 正常；
+- [x] 用户单独批准每条 Canary；
+- [x] Inbox/Project Canary 各自通过并清理；
+- [x] 用户再次批准正式启用。
 
 ### 15.4 立即停止
 
@@ -947,8 +959,11 @@ git status --short
 
 ## 16. 当前停点
 
-Phase T2 第二版设计及 ADR amendment 已通过评审，T2-B 未发布内部实现已获准，但当前代码仍无
-T2 runtime 或公开 contract。本次文档闭合完成后等待用户决定是否实际开始 T2-B。
+Phase T2 第二版设计及 ADR amendment 已通过评审。T2-B 内部 Schema、split fingerprint、Tag
+flag helper、request-closure validator、fixed tagged primitive、mutation-only readback、tagged
+verifier/service 和确定性零写入测试已实现并通过独立代码评审。T2-C 已在仓库内发布 V3
+input/output Schema、global→Project→Tag gate、双分支 runtime success parser、Tool/Server/App
+Instructions 与 MCP protocol tests；真实 Base64 transport 零写入探针也已 exact roundtrip。
 
 T2-B 批准不包含：
 
@@ -959,5 +974,18 @@ T2-B 批准不包含：
 - 创建、修改或删除任何 OmniFocus 对象；
 - 执行 Canary、正式启用或进入 Phase 4。
 
-只有用户发出开始指令后才实际进入 T2-B。T2-B 完成后必须运行 tests/build/diff、接受独立代码
-评审并停止；T2-C Schema 发布、T2-D Canary、T2-E 正式启用仍需后续独立批准。
+当前门禁为 58 test files / 828 tests、build、JXA syntax check 与 diff check 全部通过。V3 先在
+global=false、Project=true、Tag=false 下完成重载；Tunnel 与本机 STDIO 验收通过。用户完成
+App Refresh 后，客户端成功调用 `search_tags` 并保留 Tag 要求；V3 创建调用安全返回
+`write_disabled` / `mayHaveWritten=false`，exact-name pre/post `not_found`、Ledger unchanged、
+audit allowlist 和无锁检查通过。既有能力随后恢复为 global=true、Project=true、Tag=false，
+Tunnel healthy、healthz=live、readyz=ready、watchdog loaded。详见
+[T2-C Client Gate Acceptance](./PHASE_T2C_TAG_ASSIGNMENT_CLIENT_GATE_ACCEPTANCE.md)。T2-D 第一条
+tagged Inbox 与 tagged Project Canary 均已成功创建、精确验证，并在用户人工删除后通过 Ledger
+原始 ID 与 exact name 双 `not_found`、Project count restoration、Tag projection、Ledger/audit
+权限和无锁终检；详见 [T2-D Canary Acceptance](./PHASE_T2_TAG_ASSIGNMENT_CANARY_ACCEPTANCE.md)。
+T2-E 已按独立授权完成 fail-closed 正式启用：最终 plist 与 loaded environment 均为
+global/Project/Tag=`true/true/true`，Tunnel healthy，能力面仍为六 Tool、Resources absent、唯一
+mutation=`create_task`，启用过程零 mutation。详见
+[T2-E Formal Enablement Acceptance](./PHASE_T2_TAG_ASSIGNMENT_FORMAL_ENABLEMENT_ACCEPTANCE.md)。
+Phase T2 至此完成；Phase 4 ordinary parent placement 继续暂缓。

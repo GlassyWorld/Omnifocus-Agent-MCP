@@ -51,8 +51,8 @@ OMNIFOCUS_MCP_PROFILE=upstream-full
 本指南对 generic tools、mutation tools 和 Resources 的分类描述的是仓库完整 surface；在
 仓库中的 `personal-production` 注册集合包含五个 Domain reads（含只读 `search_tags`）和 ADR-006
 的 `create_task` V3；后者由 global/Project/Tag 三层 flag fail closed。V3 build、ChatGPT App
-Refresh 与禁写客户端门禁已通过；当前 loaded global=true、Project=true、Tag=false，既有
-Inbox/Project 路径已恢复，Tag flag 在后续独立验收前保持 false。该限制是 Server-side enforcement，
+Refresh、禁写客户端门禁、两条 Canary 与正式启用已通过；当前 loaded
+global=true、Project=true、Tag=true。该限制是 Server-side enforcement，
 不是客户端 allowlist。
 
 ---

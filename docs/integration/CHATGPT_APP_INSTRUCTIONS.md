@@ -50,7 +50,7 @@ For analytical answers, normally separate Confirmed facts, Analysis / inference,
 Accepted ADR。
 
 `personal-production` 表示长期的精选个人生产能力集合。当前版本有五个 read tools（含
-`search_tags`）、一个受 global/Project/Tag feature flags 保护的 `create_task` V3 且无 Resources。代码默认 fail closed；V3 App Refresh 与禁写客户端门禁已通过，当前 loaded global=true、Project=true、Tag=false，因此既有 Inbox/Project 路径可用而 tagged creation 仍被独立禁止。mutation 仍受 ADR-006、幂等 Ledger 和客户端确认约束。
+`search_tags`）、一个受 global/Project/Tag feature flags 保护的 `create_task` V3 且无 Resources。代码默认 fail closed；T2-C/D/E 已通过，当前 loaded global=true、Project=true、Tag=true。mutation 仍受 ADR-006、实时 Tag 验证、幂等 Ledger 和客户端确认约束。
 
 五个 read Tool 现在还通过 MCP `outputSchema` 声明结构化输出契约。成功响应同时提供
 经过运行时验证的 `structuredContent` 和兼容 JSON 文本 `content`；客户端进行机器处理时

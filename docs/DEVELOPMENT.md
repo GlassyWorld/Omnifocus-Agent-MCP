@@ -74,7 +74,7 @@ fresh-build STDIO MCP Domain Tool
 
 ## Profile 与发布纪律
 
-- `personal-production` 当前注册四个 Domain read tools、`create_task` 且无 Resources；改变集合必须显式
+- `personal-production` 当前注册五个 Domain read tools（含 `search_tags`）、`create_task` 且无 Resources；改变集合必须显式
   修改 `profiles` allowlist 和精确集合测试。
 - `upstream-full` 保留兼容 surface，只能显式启用；未经明确任务不删除或改变 upstream Tool
   行为。

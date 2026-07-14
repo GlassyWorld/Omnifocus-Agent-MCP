@@ -1,20 +1,21 @@
-# create_task V2 Status
+# create_task V3 Development Status
 
 ## 当前事实
 
 - [ADR-006](../../architecture/decisions/ADR-006-controlled-create-task-v1.md) 已接受 Inbox-only `create_task` V1 架构和 Phase 2/4 演进边界。
 - Phase 1 已实现 strict contract、semantic canonicalization、永久 tombstone Ledger、global mutation lock、safe no-shell JXA executor、Inbox-only primitive、exact Task readback verifier、compact handler 及 deterministic tests。
-- `create_task` 已加入 `personal-production`；当前 Profile 代码表面为五个 read Tool 加一个受 feature flag 保护的创建 Tool。corrected Schema Refresh/禁写门禁通过后，Checkpoint 7 已正式恢复生产 LaunchAgent flag=`true`。
+- `create_task` 已加入 `personal-production`；当前 Profile 代码表面为五个 read Tool 加一个受 global/Project/Tag flags 保护的 V3 创建 Tool。T2-E 已正式启用，当前加载 global=true、Project=true、Tag=true。
 - `upstream-full` 已有 `add_omnifocus_task` mutation tool，但它不是自动成立的未来 V1 契约。
 - legacy `list_tags` 和 `create_tag` 只在 `upstream-full` 注册；个人 Profile 只增加只读 `search_tags`，没有 Tag mutation Tool。
 - ADR-005 要求分析与写入分离，并把授权、确认、审计、失败/回滚和重复保护作为 mutation gateway 的复审条件。
 - Phase 2A Project placement 设计已通过评审；Phase 2B 实现、禁写客户端门禁、隔离生产 Canary、人工清理和 fail-closed 正式启用均已通过。公开 Project-specific flag 已加载为 `true`。
 - Phase T1 既有 Tag 结构化发现设计、实现、protocol/capability、真实只读和 T1-D 生产注册验收已全部通过；`search_tags` 已进入个人 Profile，生产为精确六 Tool、Resources absent。
-- Phase T2-A 第二版设计、真实只读 capability probe 与独立评审已通过；T2-B 未发布内部实现已获准但尚未开始，`create_task` 仍是 V2，尚无 `tagIds` runtime。
+- Phase T2-A 第二版设计与能力审计、T2-B 内部实现、T2-C 公开契约/客户端门禁、T2-D 两条 Canary 及 T2-E 正式启用均已通过。
+- Phase T2-D tagged Inbox 与 tagged Project Canary 均已完成单次创建、exact Tag/placement/readback、Ledger/audit/lock、Tag projection、用户人工确认/删除与 ID/name 双 `not_found` 闭环；T2-E 配置启用过程零 mutation。
 
 ## 当前判断
 
-Phase 1 已完成 corrected Schema 的正式生产部署与 Checkpoint 7 全部验收；Phase 2B Project placement 随后形成当前 V2。只有 `OMNIFOCUS_CREATE_TASK_ENABLED=true` 才能进入 Ledger/mutation service；当前生产值为 `true`，缺失、空值或其他值仍会在 Ledger/lock/JXA 前返回 `write_disabled`。
+Phase 1 已完成 corrected Schema 的正式生产部署与 Checkpoint 7 全部验收；Phase 2B Project placement 随后形成已验收 V2 baseline。T2-C 已部署并验收 V3 contract，T2-D 两条 Canary 已完整闭环，T2-E 已按 fail-closed 流程正式启用。当前 global/Project/Tag=`true/true/true`。
 
 Checkpoint 6A 已部署并通过本地 MCP 协议验收：精确五 Tool、零 Resources、固定 `write_disabled`、禁写对象 `not_found`、Ledger 目录未创建、health/ready 正常。用户已确认 ChatGPT App Refresh 和禁写 UI 测试完成。
 
@@ -40,13 +41,13 @@ Refresh 后 Web 自动 UUID 禁写门禁已通过：单次调用返回 `write_di
 
 2026-07-14 Phase T1：`search_tags` 已完成 strict structured contract、单次完整 snapshot、三态/path/exclusivity Adapter、privacy-safe no-shell executor、deterministic tests、真实只读和 T1-D 注册部署。当前 26 个 Tag 均完成 canonical ID roundtrip；生产精确六 Tool、Resources absent。App Refresh 与 Tag-create 负向路由在 global fail-closed 下通过，模型未丢弃 Tag 要求，真实库 exact-name 为 `not_found`；global/Project flags 已恢复为 `true/true`。详见 [Phase T1 Tag Discovery Acceptance](./PHASE_T1_TAG_DISCOVERY_ACCEPTANCE.md)。
 
-Phase T2-A 审计确认官方/真实 API 提供 `Tag.byIdentifier`、`Task.addTags` 和 Task Tag ID readback，但当前 verifier 仍只消费 Tag names。[Phase T2 Tag Assignment Design](./PHASE_T2_TAG_ASSIGNMENT_DESIGN.md) 第二版及 ADR-006 amendment 已通过独立评审，冻结 V3 ID-only contract、独立 flag、request-closure validation、ancestor-active/互斥、no-tag V2/tagged V3 split fingerprint、mutation-only ID readback、actual 6+ 与 tagged replay 语义。T2-B 已获准但尚未开始；公开 Schema、生产 flags、Canary 和正式启用均未获授权。
+Phase T2-A 审计确认官方/真实 API 提供 `Tag.byIdentifier`、`Task.addTags` 和 Task Tag ID readback。[Phase T2 Tag Assignment Design](./PHASE_T2_TAG_ASSIGNMENT_DESIGN.md) 第二版及 ADR-006 amendment 已通过独立评审，冻结 V3 ID-only contract、独立 flag、request-closure validation、ancestor-active/互斥、no-tag V2/tagged V3 split fingerprint、mutation-only ID readback、actual 6+ 与 tagged replay 语义。T2-B 隐藏内部实现和独立代码评审已通过；T2-C public Schema、handler gate、Instructions、protocol、App Refresh 和禁写客户端路由全部通过，详见 [T2-C Client Gate Acceptance](./PHASE_T2C_TAG_ASSIGNMENT_CLIENT_GATE_ACCEPTANCE.md)。T2-D 两条 Canary 均完成创建、验证、人工删除与双 `not_found`，详见 [T2-D Canary Acceptance](./PHASE_T2_TAG_ASSIGNMENT_CANARY_ACCEPTANCE.md)。T2-E 正式启用详见 [T2-E Formal Enablement Acceptance](./PHASE_T2_TAG_ASSIGNMENT_FORMAL_ENABLEMENT_ACCEPTANCE.md)。
 
 ## 当前生产边界
 
-- 正式公开路径仅在用户明确要求时创建一个 Task，destination 必须显式为 Inbox 或一个 exact Active Project；
+- 当前 global/Project/Tag=`true/true/true`；只在用户明确要求时创建一个 Task，destination 必须显式为 Inbox 或一个 exact Active Project，可选 1–5 个符合约束的既有 Active Tag canonical IDs；
 - 每个新创建意图必须使用新的 UUID `idempotencyKey`，透明 retry 复用同一 key；
-- Project placement 仅接受真实只读发现的 canonical Project ID，写前实时验证且不得回落 Inbox；parent、Tag、repeat、notification、batch、update、complete 和 delete 仍不在范围；
+- Project placement 仅接受真实只读发现的 canonical Project ID，写前实时验证且不得回落 Inbox；Tag assignment 仅接受 fresh `search_tags` 的 canonical IDs 并实时验证完整 Active ancestor chain、去重和互斥关系；parent、既有 Task 的 Tag 编辑、repeat、notification、batch、update、complete 和 delete 仍不在范围；
 - 新增任何 mutation 或放宽字段前必须重新走 ADR、测试、禁写 Canary 和独立生产门禁。
 
 验收模板见 [Phase 1 Probes and Acceptance](./PHASE1_PROBES_AND_ACCEPTANCE.md)。历史方向见 [`create_task` 与 Tag 方向](../../history/evolution-summaries/create-task-and-tag-direction.md)。

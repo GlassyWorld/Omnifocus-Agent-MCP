@@ -35,7 +35,7 @@
 
 - 当前 Profile：`personal-production` 与 `upstream-full`，见 [PROJECT_STATUS](./PROJECT_STATUS.md#当前节点)。
 - [`personal-production` 状态页](./design/personal-production/README.md)：当前精选生产能力与后续扩展边界。
-- [`create_task` V1 状态页](./design/create-task/README.md)：已完成 Checkpoint 6A/6B/6C/7，当前在 `personal-production` 正式启用。
+- [`create_task` V3 状态页](./design/create-task/README.md)：Phase 1/2B 与 T2-A/B/C/D/E 已通过，Inbox/Project/既有 Active Tag 创建路径已正式启用。
 - [设计区说明](./design/README.md)：进入设计阶段前必须保持的事实/授权边界。
 
 ## Query、App 与运维
@@ -58,4 +58,4 @@
 
 ## 当前下一步
 
-`personal-production` Profile semantic refactor 已在提交 `4850367` 实现并推送；`create_task` V1 基础实现与 corrected Schema 分别记录于 `c71fae4`、`c534027`，正式生产部署已通过完整门禁。写能力仍只限明确授权的单个 Inbox Task，不得从 Profile 名称推断其他 mutation。
+`personal-production` 当前精确为五个 Domain read Tool、`create_task` V3 和零 Resources。明确授权的单个 Task 可进入 Inbox 或 exact Active Project，并可选添加 1–5 个 freshly-validated 既有 Active Tag canonical IDs；不得从 Profile 名称推断 parent、Tag CRUD 或其他 mutation。
