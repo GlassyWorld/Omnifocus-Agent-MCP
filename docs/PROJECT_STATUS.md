@@ -1,7 +1,8 @@
 # Project Status
 
 > 状态日期：2026-07-15
-> `create_task` V3 的 T2-A/B/C/D/E 已通过；当前 global=true、Project=true、Tag=true
+> `create_task` V4 已部署；Inbox/Project/Tag/Parent flags=`true/true/true/true`
+> Phase 4 P4-A1/A2/A3、P4-B、P4-C、P4-D one-Canary 与 P4-E 正式启用全部通过
 
 本页只记录当前可由代码、测试、Accepted ADR 或已冻结文档支持的状态，不把后续方向写成已实现能力。
 
@@ -12,7 +13,7 @@
 - 五个 Domain Tool 的成功输出 `outputSchema`、运行时验证 `structuredContent` 和兼容 JSON 文本输出。
 - Planned/Due direct-owner 语义；inherited facts 保留但不生成重复 attention。
 - Lean Snapshot 的独立 section、完整 total、确定性排序和独立截断。
-- `personal-production` server-side curated capability boundary：注册五个 Domain read tools（含 `search_tags`）和一个受严格 runtime flags 保护的 `create_task` V3，不注册 Resources；未设置环境变量时默认使用该 Profile。
+- `personal-production` server-side curated capability boundary：注册五个 Domain read tools（含 `search_tags`）和一个受严格 runtime flags 保护的 `create_task` V4，不注册 Resources；未设置环境变量时默认使用该 Profile。
 - `upstream-full` 兼容 Profile：保留 16 个 tools、6 个 Resources，其中包括 7 个 mutation tools。
 - 当前 GPT Tool routing、ChatGPT App Instructions 和 Tunnel/LaunchAgent 运维文档。
 - `personal-production` 重构已部署；`create_task` Checkpoint 6A/6B/6C 已通过。Checkpoint 7 corrected Schema 的 Refresh/禁写门禁通过后，LaunchAgent 当时已 fail-closed 正式恢复并加载 `OMNIFOCUS_CREATE_TASK_ENABLED=true`，health/ready 与 watchdog 正常。
@@ -27,10 +28,16 @@
 - 既有 Inbox/Project 写入已恢复：loaded global/Project/Tag=`true/true/false`，Tunnel healthy、healthz=live、readyz=ready、watchdog loaded；恢复过程未创建 Task。
 - Phase T2-D 两条 Canary 均已闭环：tagged Inbox 与 tagged Project 各自仅单次创建，exact Tag/placement/readback、Ledger/audit/lock、Tag projection、用户人工确认/删除与 ID/name 双 `not_found` 全部通过；Project 计数恢复到创建前值。
 - Phase T2-E 已按独立授权正式启用：fail-closed 阶段加载 global/Project/Tag=`false/true/true`，最终 plist/loaded environment 均为 `true/true/true`；Tunnel、六 Tool/零 Resources/唯一 mutation、Schema/annotations 与零写入证据全部通过。
+- Phase 4 P4-A1 架构修订、P4-A2 fixed-script Parent facts probe 与 P4-A3 privacy-safe acceptance 已通过：当前可用真实矩阵覆盖 direct Inbox action、Project leaf、existing action group、Project root、effective completion、Project/Folder ancestry 与 exact `not_found`；59 test files/836 tests、build、TypeScript/JXA/diff checks 和 Ledger/audit/lock unchanged 通过。真实 `task.children` 已确认为 collection object；当前库无 Dropped Task，drop cases 保留为 P4-B deterministic test 硬门。
+- Phase 4 P4-B 未发布、不可达内部实现已通过：独立 Parent facts/eligibility、Parent no-tag/tagged fingerprints、Parent+Tag primitive、service、verifier 与 replay 均有 deterministic tests；Dropped/ancestor-drop 硬门已模拟闭合。公开 MCP 仍为 V3，`parentTask` wire input/output 不存在且 handler 返回 `invalid_arguments`、service 零调用；65 test files/907 tests、build、TypeScript/JXA/diff checks 通过，未执行 Parent JXA、未写 OmniFocus、未改 flags/部署。
+- Phase 4 P4-C repository fail-closed publication 已通过：源码 V4 input/output 均为 Inbox/Project/Parent 三分支 strict union，Parent flag 缺失默认 false，handler 顺序为 global→destination-specific→Tag，Parent no-tag/tagged 分支 parser、registration description、Instructions 与本地 MCP wire tests 完成；66 test files/923 tests、build、TypeScript/JXA/diff 通过。该独立 repository milestone 当时未部署、未 Refresh、未执行真实 Tool/JXA 或 OmniFocus mutation；其后续部署状态见下一条。
+- Phase 4 P4-C disabled deployment/App/UI acceptance 已通过：生产发布 V4 strict three-way Schema，精确六 Tool、Resources absent，Parent flag 在 plist/loaded environment 中均缺失；fresh exact read 确认 ordinary Action Group 后，客户端保持 Project/Parent/完整任务名并调用 Parent 分支，得到 `write_disabled.parent_placement_disabled` / `mayHaveWritten=false`。audit 恰好增加一条 allowlisted disabled 记录，Ledger 数量/签名不变、lock absent、exact-name `not_found`、Tunnel healthy；零 Parent JXA、零 OmniFocus mutation。
+- Phase 4 P4-D one-Canary acceptance 已通过：公开 Tunnel Parent flag 全程 absent，仅 one-process scope 启用；exactly-one Parent child 创建、两次 exact readback、Parent/Project count delta、Ledger/audit/lock、用户人工删除与 ID/name 双 `not_found` 闭环。用户确认清理窗口另行删除一个无关 Project-root action；验收未把 aggregate count drift 伪装成基线恢复，并以 exact identity、Parent child count 和 Project membership 证明 Canary 无残留。
+- Phase 4 P4-E 已按独立授权正式启用：fail-closed 阶段加载 global/Project/Tag/Parent=`false/true/true/true`，最终 plist/loaded environment 均为 `true/true/true/true`；Tunnel healthy、health=live、ready=ready、watchdog loaded，audit 字节级不变、Ledger 数量不变、lock absent，配置过程零 MCP Tool call/零 OmniFocus mutation。V4 Schema/tool surface 未变，无需 App Refresh。
 
 ## 进行中
 
-- 无。Phase T2 已完成，Phase 4 ordinary parent placement 继续暂缓。
+- 无。Phase 4 P4-A 至 P4-E 已闭环。
 
 ## 已决定但未实施
 
@@ -41,23 +48,25 @@
 
 ## 待实施
 
-- Phase 4：只有在 T2 稳定运行后，才可另行设计、风险评审和授权 ordinary parent Task placement；当前不进入实现。
+- 无。
 
 ## 明确不在当前范围
 
-- 当前公开生产写入仅限显式调用 `create_task` 创建一个 Task，destination 必须为 Inbox 或单个 exact Active Project；可选 1–5 个 freshly-discovered、ancestor-active、非互斥的既有 Tag canonical IDs。不得名称解析、猜测 ID、自动创建 Tag、静默省略 Tag 或回落 Inbox。
-- parent、已存在 Task 的 Tag 编辑、Tag CRUD、batch、repeat、notifications、update/delete 仍未授权。
+- 当前已启用的公开生产写入限 Inbox、单个 exact Active Project，或单个 freshly-read exact eligible ordinary Action Group，可选 1–5 个 freshly-discovered、ancestor-active、非互斥的既有 Tag canonical IDs。Parent 不得名称解析、模糊匹配、猜测 ID、Project-root/Inbox fallback 或 leaf-action placement；Tag 不得自动创建或静默省略。
+- 已存在 Task 的 Tag 编辑、Tag CRUD、batch、repeat、notifications、update/move/reparent/complete/delete 仍未授权。
 - 当前没有承诺 AI 自动决策、自动编辑/完成/删除或把分析结果自动写回 OmniFocus。
 
 ## 当前节点
 
 | 工作项 | 当前状态 | 证据 |
 |---|---|---|
-| `personal-production` | 已部署；默认 Profile；五个 Domain read tools + `create_task` V3，精确六 Tool、Resources absent；global/Project/Tag=`true/true/true` | profile/registration 代码与测试、loaded flags、Tunnel status、本机 MCP 协议验收 |
+| `personal-production` | 已部署；默认 Profile；五个 Domain read tools + `create_task` V4，精确六 Tool、Resources absent；global/Project/Tag/Parent=`true/true/true/true` | profile/registration 代码与测试、loaded flags、Tunnel status、本机 MCP 协议验收 |
 | 旧 `personal-readonly` 值 | 已移除且不提供 alias | resolver invalid-value tests、部署配置 |
 | `create_task` V2 baseline | Phase 1 Inbox 与 Phase 2B Project placement 均已正式验收；T2-C 后已恢复 global/Project=`true/true` | ADR-006、Checkpoint 6A/6B/6C/7、Phase 2A design、Phase 2B acceptance 与正式 enablement 记录 |
 | Tag Phase T1 | T1-A/B/C/D 全部通过；`search_tags` 已注册和部署，负向路由未创建无 Tag Task | Phase T1 design、748 tests、26/26 ID roundtrip、Phase T1 acceptance、exact-name `not_found` |
 | Tag Phase T2 | T2-A/B/C/D/E 已通过；Inbox/Project Canary 均完成验证和清理，Tag assignment 已正式启用 | Phase T2 design、[T2-C acceptance](./design/create-task/PHASE_T2C_TAG_ASSIGNMENT_CLIENT_GATE_ACCEPTANCE.md)、[T2-D Canary acceptance](./design/create-task/PHASE_T2_TAG_ASSIGNMENT_CANARY_ACCEPTANCE.md)、[T2-E acceptance](./design/create-task/PHASE_T2_TAG_ASSIGNMENT_FORMAL_ENABLEMENT_ACCEPTANCE.md)、58 files / 828 tests、build/JXA/diff、loaded flags、Tunnel/MCP checks |
+| Parent Phase 4 P4-B | P4-A1/A2/A3 与 P4-B milestone 已通过；其内部实现当时未发布且不可达，公开 V3 明确拒绝 Parent | [Phase 4 design](./design/create-task/PHASE4_PARENT_TASK_PLACEMENT_DESIGN.md)、[P4-A3 acceptance](./design/create-task/PHASE4_PARENT_TASK_FACTS_READONLY_ACCEPTANCE.md)、[P4-B acceptance](./design/create-task/PHASE4_PARENT_TASK_INTERNAL_IMPLEMENTATION_ACCEPTANCE.md)、65 test files / 907 tests、build、TypeScript/JXA/diff |
+| Parent Phase 4 | P4-A 至 P4-E 全部通过；ordinary Parent placement 已在 exact-ID、eligible Action Group、fail-closed validation 边界内正式启用；其他 CRUD 未授权 | [Phase 4 design](./design/create-task/PHASE4_PARENT_TASK_PLACEMENT_DESIGN.md)、[P4-C repository](./design/create-task/PHASE4_PARENT_TASK_P4C_REPOSITORY_ACCEPTANCE.md)、[P4-C client](./design/create-task/PHASE4_PARENT_TASK_P4C_DISABLED_CLIENT_ACCEPTANCE.md)、[P4-D Canary](./design/create-task/PHASE4_PARENT_TASK_P4D_CANARY_ACCEPTANCE.md)、[P4-E enablement](./design/create-task/PHASE4_PARENT_TASK_P4E_FORMAL_ENABLEMENT_ACCEPTANCE.md)、66 test files / 923 tests、build/TypeScript/JXA/diff、loaded flags、Tunnel health、zero-mutation evidence |
 | Legacy Tag | full-only `list_tags`/`create_tag` 保持不变；`create_tag` 永久不进入个人 Profile | registration 代码与测试 |
 
 详细证据见 [SOURCE_MAP.md](./SOURCE_MAP.md)。
