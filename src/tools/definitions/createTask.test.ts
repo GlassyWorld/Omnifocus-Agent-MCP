@@ -27,6 +27,19 @@ const taggedProjectEnabledEnv = {
   ...projectEnabledEnv,
   OMNIFOCUS_CREATE_TASK_TAGS_ENABLED: "true",
 };
+const parentEnabledEnv = {
+  ...enabledEnv,
+  OMNIFOCUS_CREATE_TASK_PARENT_ENABLED: "true",
+};
+const taggedParentEnabledEnv = {
+  ...parentEnabledEnv,
+  OMNIFOCUS_CREATE_TASK_TAGS_ENABLED: "true",
+};
+const parentInput = {
+  name: "Task",
+  destination: { kind: "parentTask" as const, parentTaskId: "parent-1" },
+  idempotencyKey: key,
+};
 const success = {
   success: true as const,
   created: {
@@ -47,13 +60,30 @@ const taggedSuccess = {
   ...success,
   created: { ...success.created, tagIds: ["tag-a"] },
 };
+const parentSuccess = {
+  ...success,
+  created: {
+    ...success.created,
+    location: {
+      kind: "parentTask" as const,
+      parentTaskId: "parent-1",
+      parentTaskName: "Parent",
+      projectId: "project-1",
+      projectName: "Project",
+    },
+  },
+};
+const taggedParentSuccess = {
+  ...parentSuccess,
+  created: { ...parentSuccess.created, tagIds: ["tag-a"] },
+};
 
 function extra(requestId: string | number = 1) {
   return { requestId } as Parameters<typeof handler>[1];
 }
 
 describe("create_task handler", () => {
-  it("publishes a strict V3 schema with optional bounded tagIds", () => {
+  it("publishes a strict V4 schema with three destinations and optional bounded tagIds", () => {
     expect(Object.keys(schema.shape).sort()).toEqual([
       "deferDate",
       "destination",
@@ -80,6 +110,52 @@ describe("create_task handler", () => {
       tagIds: ["1", "2", "3", "4", "5", "6"],
     }).success).toBe(false);
     expect(inputSchema.safeParse({ name: "Task", destination: { kind: "inbox" } }).success).toBe(false);
+    expect(schema.safeParse({
+      ...parentInput,
+      destination: { ...parentInput.destination, projectId: "project-1" },
+    }).success).toBe(false);
+    expect(schema.safeParse(parentInput).success).toBe(true);
+  });
+
+  it("publishes Parent fail-closed before service with a reason-qualified audit", async () => {
+    const factsReader = vi.fn();
+    const ledger = vi.fn();
+    const lock = vi.fn();
+    const executor = vi.fn();
+    const readback = vi.fn();
+    const service: CreateTaskHandlerService = {
+      execute: vi.fn(async () => {
+        factsReader();
+        ledger();
+        lock();
+        executor();
+        readback();
+        return parentSuccess;
+      }),
+    };
+    const records: CreateTaskCanaryAuditRecord[] = [];
+    const result = await handler(
+      parentInput,
+      extra("private-request"),
+      service,
+      enabledEnv,
+      record => records.push(record),
+    );
+    expect(JSON.parse(result.content[0].text).error).toMatchObject({
+      code: "write_disabled",
+      reason: "parent_placement_disabled",
+      mayHaveWritten: false,
+      retrySafe: false,
+    });
+    expect(service.execute).not.toHaveBeenCalled();
+    expect(factsReader).not.toHaveBeenCalled();
+    expect(ledger).not.toHaveBeenCalled();
+    expect(lock).not.toHaveBeenCalled();
+    expect(executor).not.toHaveBeenCalled();
+    expect(readback).not.toHaveBeenCalled();
+    expect(records[0].resultCode).toBe("write_disabled.parent_placement_disabled");
+    expect(JSON.stringify(records)).not.toContain("parent-1");
+    expect(JSON.stringify(records)).not.toContain("private-request");
   });
 
   it("runs the strict object parser and rejects extra fields before service", async () => {
@@ -172,6 +248,49 @@ describe("create_task handler", () => {
     expect(service.execute).not.toHaveBeenCalled();
   });
 
+  it("preserves global then Parent then Tag gate order", async () => {
+    const taggedParentInput = { ...parentInput, tagIds: ["tag-a"] };
+    const service = { execute: vi.fn() };
+
+    const global = await handler(taggedParentInput, extra(), service, {}, vi.fn());
+    expect(JSON.parse(global.content[0].text).error).not.toHaveProperty("reason");
+
+    const parent = await handler(taggedParentInput, extra(), service, enabledEnv, vi.fn());
+    expect(JSON.parse(parent.content[0].text).error.reason).toBe("parent_placement_disabled");
+
+    const tag = await handler(taggedParentInput, extra(), service, parentEnabledEnv, vi.fn());
+    expect(JSON.parse(tag.content[0].text).error.reason).toBe("tag_assignment_disabled");
+    expect(service.execute).not.toHaveBeenCalled();
+  });
+
+  it("dispatches Parent without requiring the Project flag", async () => {
+    const service: CreateTaskHandlerService = {
+      execute: vi.fn().mockResolvedValue(parentSuccess),
+    };
+    const result = await handler(parentInput, extra(), service, parentEnabledEnv, vi.fn());
+    expect(result.structuredContent?.created.location).toMatchObject({
+      kind: "parentTask",
+      parentTaskId: "parent-1",
+    });
+    expect(service.execute).toHaveBeenCalledWith(parentInput, key);
+  });
+
+  it("dispatches tagged Parent only when Parent and Tag flags are true", async () => {
+    const taggedInput = { ...parentInput, tagIds: ["tag-a"] };
+    const service: CreateTaskHandlerService = {
+      execute: vi.fn().mockResolvedValue(taggedParentSuccess),
+    };
+    const result = await handler(
+      taggedInput,
+      extra(),
+      service,
+      taggedParentEnabledEnv,
+      vi.fn(),
+    );
+    expect(result.structuredContent?.created.tagIds).toEqual(["tag-a"]);
+    expect(service.execute).toHaveBeenCalledWith(taggedInput, key);
+  });
+
   it("dispatches tagged Inbox/Project only when all applicable flags are exactly true", async () => {
     const service: CreateTaskHandlerService = {
       execute: vi.fn().mockResolvedValue(taggedSuccess),
@@ -229,6 +348,24 @@ describe("create_task handler", () => {
       vi.fn(),
     );
     expect(JSON.parse(taggedWithoutIds.content[0].text).error.code).toBe("internal_error");
+
+    const parentNoTagWithIds = await handler(
+      parentInput,
+      extra(),
+      { execute: vi.fn().mockResolvedValue(taggedParentSuccess) },
+      parentEnabledEnv,
+      vi.fn(),
+    );
+    expect(JSON.parse(parentNoTagWithIds.content[0].text).error.code).toBe("internal_error");
+
+    const taggedParentWithoutIds = await handler(
+      { ...parentInput, tagIds: ["tag-a"] },
+      extra(),
+      { execute: vi.fn().mockResolvedValue(parentSuccess) },
+      taggedParentEnabledEnv,
+      vi.fn(),
+    );
+    expect(JSON.parse(taggedParentWithoutIds.content[0].text).error.code).toBe("internal_error");
   });
 
   it("keeps Project resolver, Ledger, lock, and executor unreachable when its flag is false", async () => {

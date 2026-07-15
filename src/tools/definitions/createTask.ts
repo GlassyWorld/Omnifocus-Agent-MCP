@@ -11,36 +11,49 @@ import {
   createTaskSuccessSchema,
 } from "../../domain/taskCreation/createTaskSchemas.js";
 import { CreateTaggedTaskService } from "../../domain/taskCreation/createTaggedTaskService.js";
+import { CreateParentTaskService } from "../../domain/taskCreation/createParentTaskService.js";
+import {
+  createTaskInputSchemaV4,
+  createTaskOutputSchemaV4,
+  createTaskPublicInputShapeV4,
+  hasParentDestination,
+  parentCreateTaskInputSchema,
+  parentCreateTaskSuccessWithoutTagsSchema,
+  taggedParentCreateTaskSuccessSchema,
+  type CreateTaskInputV4,
+  type ParentCreateTaskSuccess,
+} from "../../domain/taskCreation/createParentTaskSchemas.js";
 import {
   createTaskInputSchemaV3,
-  createTaskOutputSchemaV3,
-  createTaskPublicInputShapeV3,
   hasTagAssignment,
   taggedCreateTaskSuccessSchema,
-  type CreateTaskInputV3,
   type TaggedCreateTaskSuccess,
 } from "../../domain/taskCreation/createTaskTagSchemas.js";
 import { createInboxTask } from "../primitives/createInboxTask.js";
 import { createTaskInProject } from "../primitives/createTaskInProject.js";
 import { getTask } from "../primitives/getTask.js";
 import { createTaggedTask } from "../primitives/createTaggedTask.js";
+import { createTaskUnderParent } from "../primitives/createTaskUnderParent.js";
+import { readParentTaskFactsById } from "../primitives/readParentTaskFacts.js";
 import { readCreatedTaskForVerification } from "../primitives/readCreatedTaskForVerification.js";
 import { isCreateTaskMutationEnabled } from "../../config/createTaskFeatureFlag.js";
 import { isCreateTaskProjectPlacementEnabled } from "../../config/createTaskProjectFeatureFlag.js";
+import { isCreateTaskParentPlacementEnabled } from "../../config/createTaskParentFeatureFlag.js";
 import { isCreateTaskTagAssignmentEnabled } from "../../config/createTaskTagsFeatureFlag.js";
 import {
   canonicalizeCreateTaskInput,
   canonicalizeTaggedCreateTaskInput,
 } from "../../domain/taskCreation/createTaskCanonicalizer.js";
+import { canonicalizeParentCreateTaskInput } from "../../domain/taskCreation/createParentTaskCanonicalizer.js";
 import { hashIdempotencyKey } from "../../domain/taskCreation/createTaskLedger.js";
 import { resolveProjectById } from "../../domain/taskCreation/projectDestination.js";
 
 // MCP SDK 1.29 serializes refined/effects schemas as an empty JSON Schema.
 // Register a strict ZodObject so clients receive the complete properties and
 // required list; the handler still runs the full relation-aware parser.
-export const schema = z.object(createTaskPublicInputShapeV3).strict();
+export const schema = z.object(createTaskPublicInputShapeV4).strict();
 export const inputSchema = schema;
-export const outputSchema = createTaskOutputSchemaV3;
+export const outputSchema = createTaskOutputSchemaV4;
 export const annotations = {
   readOnlyHint: false,
   destructiveHint: false,
@@ -50,9 +63,13 @@ export const annotations = {
 
 export interface CreateTaskHandlerService {
   execute(
-    input: CreateTaskInputV3,
+    input: CreateTaskInputV4,
     effectiveKey: string,
-  ): Promise<z.infer<typeof createTaskSuccessSchema> | TaggedCreateTaskSuccess>;
+  ): Promise<
+    | z.infer<typeof createTaskSuccessSchema>
+    | TaggedCreateTaskSuccess
+    | ParentCreateTaskSuccess
+  >;
 }
 
 export interface CreateTaskCanaryAuditRecord {
@@ -103,12 +120,22 @@ function defaultService(): CreateTaskHandlerService {
     resolveProjectById,
     readCreatedTaskForVerification,
   });
+  const parentService = new CreateParentTaskService({
+    ledger,
+    readParentTaskFactsById,
+    createTaskUnderParent,
+    readCreatedTaskForVerification,
+  });
   return {
     execute(input, effectiveKey) {
-      if (hasTagAssignment(input)) {
-        return taggedService.execute(input, effectiveKey);
+      if (hasParentDestination(input)) {
+        return parentService.execute(parentCreateTaskInputSchema.parse(input), effectiveKey);
       }
-      return noTagService.execute(createTaskInputSchema.parse(input), effectiveKey);
+      const legacyInput = createTaskInputSchemaV3.parse(input);
+      if (hasTagAssignment(legacyInput)) {
+        return taggedService.execute(legacyInput, effectiveKey);
+      }
+      return noTagService.execute(createTaskInputSchema.parse(legacyInput), effectiveKey);
     },
   };
 }
@@ -133,11 +160,11 @@ export async function handler(
   auditSink: CreateTaskCanaryAuditSink = defaultAuditSink,
 ) {
   const startedAt = Date.now();
-  const parsed = createTaskInputSchemaV3.safeParse(args);
+  const parsed = createTaskInputSchemaV4.safeParse(args);
   if (!parsed.success) {
     return errorResponse(new CreateTaskOperationError({
       code: "invalid_arguments",
-      message: "The create_task arguments do not satisfy the strict V3 contract.",
+      message: "The create_task arguments do not satisfy the strict V4 contract.",
       mayHaveWritten: false,
       retrySafe: false,
     }));
@@ -154,10 +181,15 @@ export async function handler(
 
   // Preserve the same semantic normalization boundary in disabled and enabled
   // Canary runs without retaining or logging the payload.
-  if (hasTagAssignment(parsed.data)) {
-    canonicalizeTaggedCreateTaskInput(parsed.data);
+  if (hasParentDestination(parsed.data)) {
+    canonicalizeParentCreateTaskInput(parentCreateTaskInputSchema.parse(parsed.data));
   } else {
-    canonicalizeCreateTaskInput(createTaskInputSchema.parse(parsed.data));
+    const legacyInput = createTaskInputSchemaV3.parse(parsed.data);
+    if (hasTagAssignment(legacyInput)) {
+      canonicalizeTaggedCreateTaskInput(legacyInput);
+    } else {
+      canonicalizeCreateTaskInput(createTaskInputSchema.parse(legacyInput));
+    }
   }
   const canaryMetadata = {
     requestMetadataHash: hashIdempotencyKey(String(extra.requestId)),
@@ -190,7 +222,26 @@ export async function handler(
   }
 
   if (
-    hasTagAssignment(parsed.data)
+    parsed.data.destination.kind === "parentTask"
+    && !isCreateTaskParentPlacementEnabled(env)
+  ) {
+    emitCanaryAudit(
+      auditSink,
+      canaryMetadata,
+      "write_disabled.parent_placement_disabled",
+      startedAt,
+    );
+    return errorResponse(new CreateTaskOperationError({
+      code: "write_disabled",
+      message: "Parent placement is registered for canary validation but mutation is disabled.",
+      mayHaveWritten: false,
+      retrySafe: false,
+      reason: "parent_placement_disabled",
+    }));
+  }
+
+  if (
+    parsed.data.tagIds !== undefined
     && !isCreateTaskTagAssignmentEnabled(env)
   ) {
     emitCanaryAudit(
@@ -211,9 +262,13 @@ export async function handler(
   try {
     const activeService = service ?? defaultService();
     const rawResult = await activeService.execute(parsed.data, effectiveKey);
-    const result = hasTagAssignment(parsed.data)
-      ? taggedCreateTaskSuccessSchema.parse(rawResult)
-      : createTaskSuccessSchema.parse(rawResult);
+    const result = hasParentDestination(parsed.data)
+      ? parsed.data.tagIds === undefined
+        ? parentCreateTaskSuccessWithoutTagsSchema.parse(rawResult)
+        : taggedParentCreateTaskSuccessSchema.parse(rawResult)
+      : parsed.data.tagIds === undefined
+        ? createTaskSuccessSchema.parse(rawResult)
+        : taggedCreateTaskSuccessSchema.parse(rawResult);
     emitCanaryAudit(auditSink, canaryMetadata, "success", startedAt);
     return {
       structuredContent: result,

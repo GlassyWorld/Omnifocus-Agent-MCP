@@ -80,6 +80,14 @@ describe("getServerInstructions", () => {
     expect(instructions).toContain("fresh get_project read");
     expect(instructions).toContain("Project name plus the available Folder");
     expect(instructions).toContain("A prior get_project call alone is insufficient");
+    expect(instructions).toContain("fresh get_task read in the same user intent");
+    expect(instructions).toContain("Only an existing Action Group is eligible");
+    expect(instructions).toContain("Parent Task name and kind");
+    expect(instructions).toContain("available parent-chain distinction");
+    expect(instructions).toContain("A prior get_task call alone is insufficient");
+    expect(instructions).toContain("leaf Action, Project Root");
+    expect(instructions).toContain("parent_placement_disabled");
+    expect(instructions).toContain("fall back to Inbox or Project");
     expect(instructions).toContain("separately accepted prepare/commit flow");
     expect(instructions).toContain("do not silently omit tagIds or create an untagged Task");
     expect(instructions).toContain("1-5 unique canonical IDs");

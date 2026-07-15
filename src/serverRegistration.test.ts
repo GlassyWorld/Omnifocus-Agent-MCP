@@ -110,6 +110,26 @@ describe("profile-specific server registration", () => {
         "name",
       ]);
       expect(createTask?.inputSchema.additionalProperties).toBe(false);
+      const destinations = createTask?.inputSchema.properties?.destination?.anyOf ?? [];
+      expect(destinations).toHaveLength(3);
+      expect(destinations.map(variant => variant.properties?.kind?.const)).toEqual([
+        "inbox",
+        "project",
+        "parentTask",
+      ]);
+      expect(destinations.map(variant => variant.additionalProperties)).toEqual([
+        false,
+        false,
+        false,
+      ]);
+      expect(destinations[2]).toMatchObject({
+        required: ["kind", "parentTaskId"],
+        properties: {
+          parentTaskId: {
+            $ref: "#/properties/destination/anyOf/1/properties/projectId",
+          },
+        },
+      });
       expect(createTask?.inputSchema.properties?.tagIds).toMatchObject({
         type: "array",
         minItems: 1,
@@ -138,9 +158,30 @@ describe("profile-specific server registration", () => {
           },
         },
       });
+      const locations = createTask?.outputSchema.properties?.created?.properties
+        ?.location?.anyOf ?? [];
+      expect(locations).toHaveLength(3);
+      expect(locations.map(variant => variant.properties?.kind?.const)).toEqual([
+        "inbox",
+        "project",
+        "parentTask",
+      ]);
+      expect(locations[2]).toMatchObject({
+        required: [
+          "kind",
+          "parentTaskId",
+          "parentTaskName",
+          "projectId",
+          "projectName",
+        ],
+        additionalProperties: false,
+      });
       expect(createTask?.description).toContain("existing Active Tags");
       expect(createTask?.description).toContain("canonical IDs");
       expect(createTask?.description).toContain("never creates Tags");
+      expect(createTask?.description).toContain("fresh get_task read");
+      expect(createTask?.description).toContain("ordinary Action Group");
+      expect(createTask?.description).toContain("reparenting");
     } finally {
       await client.close();
       await server.close();
@@ -231,6 +272,20 @@ describe("profile-specific server registration", () => {
       destination: { kind: "project", projectId: "project-1" },
       idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
     }).success).toBe(true);
+    expect(createInputSchema.safeParse({
+      name: "Task",
+      destination: { kind: "parentTask", parentTaskId: "parent-1" },
+      idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+    }).success).toBe(true);
+    expect(createInputSchema.safeParse({
+      name: "Task",
+      destination: {
+        kind: "parentTask",
+        parentTaskId: "parent-1",
+        projectId: "project-1",
+      },
+      idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+    }).success).toBe(false);
   });
 
   it("registers the complete upstream tool and resource surface for upstream-full", () => {
