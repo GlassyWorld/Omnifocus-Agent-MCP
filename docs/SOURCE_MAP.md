@@ -1,34 +1,166 @@
-# Source Map
+# 来源地图
 
-> 用途：让关键结论可以追溯到当前权威、历史来源、被替代范围和代码/测试证据。历史来源不是当前事实的替代品。
+> 本文件用途：说明不同类型问题应优先去哪里验证。
+> 本文件是导航表，不是完整项目历史，也不替代代码、测试、ADR 或验收记录。
 
-| 结论 | 当前权威文件 | 历史/支持来源 | 被替代来源或范围 | 代码/测试证据 |
-|---|---|---|---|---|
-| 个性化架构采用 Domain-first | [ADR-001](./architecture/decisions/ADR-001-domain-first-architecture.md) | `README.md`、[v1 实现与验收历史](./history/personalization-v1-implementation-and-acceptance.md)、两份 Audit | handler 直接承载业务语义、Raw/query 直接作为个性化契约的方向 | `src/domain/**`、Domain tests、Tool definitions |
-| 四个当前 Domain read tools 已完成 | 当前代码与 tests、[PROJECT_STATUS](./PROJECT_STATUS.md) | 四类工程日志、README | 无 | `src/tools/definitions/get{Task,Project,CompletedSince,LeanSnapshot}*`、`src/serverRegistration.test.ts` |
-| Planned/Due 只由 direct owner 生成 visibility | [ADR-002](./architecture/decisions/ADR-002-direct-owner-semantics.md) | Planned/Due 修订日志、[v1 实现与验收历史](./history/personalization-v1-implementation-and-acceptance.md) | Snapshot 初始实现中的 inherited child fan-out | `src/domain/snapshot/**` 及 tests |
-| Defer/Planned/Due 保存 direct/effective/source | Domain types/tests、ADR-002 | Task/Project 工程日志 | 只返回单一 effective 日期而不保留来源的简化表达 | `src/domain/task/dateSemantics.ts`、Project/Snapshot resolvers |
-| Lean Snapshot 与 Full Snapshot 独立 | [ADR-004](./architecture/decisions/ADR-004-lean-snapshot-scope.md) | Snapshot 工程日志、README | `dump_database` 等同稳定 Full Snapshot MCP、立即开发 Full Snapshot 的方向 | Snapshot composer/schema/tests；`dump_database` 独立 upstream tool |
-| section total 在截断前计算，sections 独立截断 | ADR-004、Snapshot tests | Due 修订日志 | 从截断后的 active items 派生 planned/deadline | Snapshot composer/tests |
-| Action 当前属于 Task Domain | [ADR-003](./architecture/decisions/ADR-003-task-action-boundary.md) | Task 工程日志、两份 Audit | 立即增加 `ActionView`/`get_action` | Task types/classifier/tests |
-| AI analysis 与 mutation 分离 | [ADR-005](./architecture/decisions/ADR-005-ai-boundary.md) | GPT Guide、App Instructions、README | AI 根据分析自动写入、Domain 输出 recommendation | Server Instructions tests、Profile registration tests |
-| `personal-production` 是 server-side curated capability boundary，当前为五读一写 | profile/registration 代码与测试、[PROJECT_STATUS](./PROJECT_STATUS.md) | README、Audit、Tunnel 手册 | 旧 `personal-readonly` 名称；仅依赖客户端 allowlist/提示词形成安全边界 | `src/config/serverProfile.ts`、`src/serverRegistration.ts` 及 tests |
-| `upstream-full` 保留 16 tools/6 Resources/7 mutation tools | registration 代码与测试 | Architecture Audit、GPT Guide | “仓库已完全删除写入能力” | `TOOL_REGISTRY` 和 full-profile tests |
-| 五个 Domain read Tool 有结构化成功输出 | Tool definitions/schemas/tests | Architecture Audit、GPT Guide、App Instructions | 只有 JSON 文本、没有 descriptor outputSchema 的旧状态 | `outputSchema`、`structuredContent` tests、registration descriptor tests |
-| `query_omnifocus` 是 generic full-profile read tool | registration code、[Query Reference](../QUERY_TOOL_REFERENCE.md) | Examples、GPT Guide | 把它列为 `personal-production` 当前 surface | `src/serverRegistration.ts` 及 tests |
-| 当前只有 `personal-production` 和 `upstream-full` Profiles | profile code/tests | README、Tunnel 手册 | 旧 `personal-readonly` Profile；空值默认 full | `src/config/serverProfile.ts` 及 tests |
-| `personal-production` 当前精确注册五个 Domain read tools（含 `search_tags`）、`create_task` 且无 Resources | 当前代码/测试、[状态页](./design/personal-production/README.md) | Profile refactor、T1 与 create_task 验收记录 | 从 `create_task` 推断其他 mutation 能力 | registration allowlist、精确六 Tool 集合和 Resource tests |
-| `create_task` V1 已完成 Checkpoint 6A/6B/6C/7 并正式启用 | [ADR-006](./architecture/decisions/ADR-006-controlled-create-task-v1.md)、[状态页](./design/create-task/README.md)、[Checkpoint 7 验收](./design/create-task/CHECKPOINT7_FORMAL_ENABLEMENT_ACCEPTANCE.md) | ADR-005 mutation 复审条件、探针/Canary/Retry 验收记录 | 把 `add_omnifocus_task` 等同新契约、从 `create_task` 推断其他 mutation | `src/domain/taskCreation/**`、`createInboxTask`、safe JXA executor、required UUID wire Schema、feature flag 及 tests；`personal-production` 精确五 Tool、零 Resources、唯一 mutation 为 `create_task` |
-| `create_task` V3 T2-C 已通过 App Refresh 与禁写客户端门禁 | [T2-C 验收](./design/create-task/PHASE_T2C_TAG_ASSIGNMENT_CLIENT_GATE_ACCEPTANCE.md)、[Phase T2 设计](./design/create-task/PHASE_T2_TAG_ASSIGNMENT_DESIGN.md) | T1 discovery 验收、Phase 2B acceptance | 把已发布 `tagIds` Schema 等同当时已授权 Tag mutation、静默丢弃 Tag 要求 | V3 Schema/protocol tests、global→Project→Tag gates、当时 loaded global/Project/Tag=`true/true/false`、客户端 `write_disabled` 与 exact-name `not_found` |
-| `create_task` V3 T2-D tagged Inbox 与 tagged Project Canary 均已完成创建、验证、人工删除与双 `not_found` | [T2-D Canary 验收](./design/create-task/PHASE_T2_TAG_ASSIGNMENT_CANARY_ACCEPTANCE.md)、[Phase T2 设计](./design/create-task/PHASE_T2_TAG_ASSIGNMENT_DESIGN.md) | T2-C client gate | 从两条 Canary 通过自动推断 T2-E 授权 | exact Tag ID-set、Inbox/Project/parent/ID/name readback、Project direct/all count 恢复、Ledger verified/success、audit allowlist、无锁、Tag projection unchanged、删除后双 `not_found`；T2-D 期间公开 Tag flag=false |
-| `create_task` V3 T2-E Tag assignment 已正式启用 | [T2-E 正式启用验收](./design/create-task/PHASE_T2_TAG_ASSIGNMENT_FORMAL_ENABLEMENT_ACCEPTANCE.md)、[Phase T2 设计](./design/create-task/PHASE_T2_TAG_ASSIGNMENT_DESIGN.md)、[PROJECT_STATUS](./PROJECT_STATUS.md) | T2-C/T2-D acceptance | 从 Tag assignment 推断 Tag CRUD、parent 或其他 mutation | fail-closed `false/true/true` 后最终 plist/loaded `true/true/true`、六 Tool、Resources absent、唯一 mutation、58 files/828 tests、build/JXA/diff、Ledger/audit unchanged、无锁、Tunnel healthy |
-| Phase 4 P4-A 与 P4-B facts/internal implementation 验收已通过 | [Phase 4 设计](./design/create-task/PHASE4_PARENT_TASK_PLACEMENT_DESIGN.md)、[P4-A3 只读验收](./design/create-task/PHASE4_PARENT_TASK_FACTS_READONLY_ACCEPTANCE.md)、[P4-B 内部实现验收](./design/create-task/PHASE4_PARENT_TASK_INTERNAL_IMPLEMENTATION_ACCEPTANCE.md)、[PROJECT_STATUS](./PROJECT_STATUS.md) | ADR-005、ADR-006 Phase 4 amendment、Project/Tag 既有 resolver/Ledger/primitive/replay 模式 | 从 P4-B 内部代码存在或当时的 V3 拒绝证据推断当前生产已发布 V4、Parent runtime 可达、Canary 或正式启用 | dedicated facts/eligibility、split fingerprints、Parent+Tag primitive/service/verifier/replay；P4-B 时公开 V3 protocol rejects `parentTask` before service；65 test files/907 tests、build、TypeScript/JXA/diff；real Dropped unavailable but deterministic drop matrix closed；zero Parent JXA execution/OmniFocus mutation/deploy |
-| Phase 4 P4-C repository 与 disabled client acceptance 已通过；生产发布 V4，Parent 仍 fail-closed | [P4-C repository acceptance](./design/create-task/PHASE4_PARENT_TASK_P4C_REPOSITORY_ACCEPTANCE.md)、[P4-C disabled client acceptance](./design/create-task/PHASE4_PARENT_TASK_P4C_DISABLED_CLIENT_ACCEPTANCE.md)、[Phase 4 设计](./design/create-task/PHASE4_PARENT_TASK_PLACEMENT_DESIGN.md)、[PROJECT_STATUS](./PROJECT_STATUS.md) | P4-A/P4-B evidence、ADR-005、ADR-006 Phase 4 amendment | 从 V4 publication/disabled UI PASS 推断 Parent Canary、Parent enablement、prepare/commit 或其他 CRUD 已授权 | strict V4 three-way input/output、Parent flag absent/default-false、exact six Tools/Resources absent、fresh exact Action Group read、client target binding、`write_disabled.parent_placement_disabled`、single allowlisted audit delta、Ledger unchanged、lock absent、exact `not_found`、zero Parent JXA/mutation、Tunnel healthy |
-| Phase 4 P4-D exactly-one Parent Canary 已通过并清理 | [P4-D Canary acceptance](./design/create-task/PHASE4_PARENT_TASK_P4D_CANARY_ACCEPTANCE.md)、[Phase 4 设计](./design/create-task/PHASE4_PARENT_TASK_PLACEMENT_DESIGN.md)、[PROJECT_STATUS](./PROJECT_STATUS.md) | P4-C disabled client target-binding、ADR-006 Phase 4 amendment | 从隔离 Canary PASS 推断 Parent production flag 已启用、允许第二次 Canary 或允许其他 CRUD | one-process Parent flag、fresh exact eligible Action Group、single create、two exact readbacks、Parent/Project count deltas、Ledger verified/checksum、single allowlisted audit、lock absent、manual delete、ID/name `not_found`、Parent count restored、Canary absent from Project sets；同期无关 Project-root 删除由用户确认并独立归因 |
-| Phase 4 P4-E ordinary Parent placement 已正式启用 | [P4-E Formal Enablement Acceptance](./design/create-task/PHASE4_PARENT_TASK_P4E_FORMAL_ENABLEMENT_ACCEPTANCE.md)、[Phase 4 设计](./design/create-task/PHASE4_PARENT_TASK_PLACEMENT_DESIGN.md)、[PROJECT_STATUS](./PROJECT_STATUS.md) | P4-C/P4-D acceptance、ADR-005、ADR-006 Phase 4 amendment | 从 Parent create 启用推断名称/fuzzy placement、leaf placement、edit/move/reparent/complete/delete/batch 或新增 mutation Tool | fail-closed `false/true/true/true` 后最终 plist/loaded global/Project/Tag/Parent=`true/true/true/true`、Tunnel healthy、health/ready/watchdog、audit byte-identical、Ledger count unchanged、lock absent、zero Tool call/mutation、66 test files/923 tests、build/TypeScript/JXA/diff |
-| Tag primitive 已存在但不在个人 Profile | registration code/tests | Architecture Audit、GPT Guide | “仓库完全不支持 Tag” | `list_tags`、`create_tag` definitions/primitives；full-only registry |
-| 工程日志是稳定历史，不应删除 | [engineer_log 索引](../engineer_log/README.md) | README Maintenance Reference、Architecture Audit | 无 | Git 历史保留各里程碑提交 |
+## 文件职责分层
 
-## 原始材料边界
+- `AGENTS.md`：Codex 进入仓库后应如何工作。
+- `docs/PROJECT_STATUS.md`：当前项目是什么状态。
+- `docs/SOURCE_MAP.md`：遇到问题应去哪里找证据。
+- ADR：为什么这样设计。
+- Design docs：具体设计和阶段验收。
+- Code + Tests：最终事实来源。
 
-项目内没有原始 ChatGPT/Codex 对话导出。本页映射的是代码、测试、ADR、工程日志和整理后的文档，不应被描述成对全部云端聊天历史的来源映射。
+## 真实状态判断顺序
+
+当来源之间出现冲突时，按以下顺序判断：
+
+1. 当前代码与测试
+2. 已接受 ADR 及其 amendment / 冻结契约
+3. 最新验收记录
+4. `docs/PROJECT_STATUS.md`
+5. 设计文档
+6. 历史草案、工程日志和过往讨论
+
+历史文档用于解释决策背景，不自动代表当前能力。
+
+## 问题类型与权威来源
+
+| 问题 | 优先查看 | 辅助来源 | 说明 |
+|---|---|---|---|
+| 当前 `personal-production` Tool 数量 | `src/serverRegistration.test.ts` | `src/serverRegistration.ts`、`docs/PROJECT_STATUS.md` | 注册测试是最快的精确验证入口。 |
+| 当前 Resource 边界 | `src/serverRegistration.test.ts` | `src/serverRegistration.ts` | `personal-production` 当前不暴露 Resources。 |
+| 新增、删除或修改 MCP Tool | `src/serverRegistration.ts` | `src/serverRegistration.test.ts`、相关 Tool definition | Tool surface 变化必须从 registration 和精确集合测试开始确认。 |
+| 当前 Profile 选择逻辑 | `src/config/serverProfile.ts` | `src/config/serverProfile.test.ts` | 默认行为由 resolver 代码定义。 |
+| Domain-first 架构原则 | `docs/architecture/decisions/ADR-001-domain-first-architecture.md` | `docs/DEVELOPMENT.md`、`src/domain/**` | 不绕过 Adapter / Domain / Mapper 边界。 |
+| AI 与 mutation 边界 | `docs/architecture/decisions/ADR-005-ai-boundary.md` | `src/serverInstructions.ts`、相关测试 | 分析、建议、计划不等于 mutation 授权。 |
+| `create_task` 总体契约 | `docs/architecture/decisions/ADR-006-controlled-create-task-v1.md` + accepted amendments | `docs/design/create-task/README.md`、Phase acceptance docs | ADR-006 包含历史文本，阅读时必须结合 amendment 与当前状态。 |
+| `create_task` 当前 public schema | `src/tools/definitions/createTask.ts` | `src/domain/taskCreation/*Schemas.ts`、`src/serverRegistration.test.ts` | wire schema 必须保持 strict 且 client-visible。 |
+| `create_task` runtime 行为 | `src/domain/taskCreation/` | Ledger、verifier、service、primitive tests | 保持 feature gates、Ledger、lock、verification、错误语义。 |
+| mutation error semantics | `src/domain/taskCreation/createTaskErrors.ts` | Ledger、verifier、service tests | 重点确认 `mayHaveWritten`、`retrySafe`、fail-closed、partial success 和 replay 语义。 |
+| Tag discovery | `src/domain/tag/**` | `src/tools/definitions/searchTags.ts`、相关测试 | `search_tags` 是只读发现，不是写入授权。 |
+| Parent placement | `src/domain/taskCreation/` 中 parent-related modules | Phase 4 design / acceptance docs | 当前仅允许 parent kind 为 Action Group 的 ordinary parent placement。Leaf Action parent placement is intentionally deferred and requires separate design review. |
+| `upstream-full` 兼容能力 | `src/serverRegistration.ts` | `src/serverRegistration.test.ts` | `upstream-full` 更宽，不代表生产默认能力。 |
+| 默认开发验证 | `docs/DEVELOPMENT.md` | `package.json`、`vitest.config.ts` | 默认验证是 build、unit tests、diff check。 |
+| 真实 OmniFocus 验收 | 相关 Phase acceptance docs | integration tests、Tunnel/LaunchAgent 运维文档 | 真实写入、canary、部署操作必须单独授权。 |
+| Tunnel / LaunchAgent 状态 | Tunnel 运维文档与实时检查 | acceptance docs | 运行时状态可能漂移，不能只靠仓库文档断言。 |
+
+## 修改类型快速入口
+
+### 新增或修改 MCP Tool
+
+先阅读：
+
+- `docs/PROJECT_STATUS.md`
+- `src/serverRegistration.ts`
+- `src/serverRegistration.test.ts`
+- 相关 Tool definition
+- 相关 Domain / primitive / schema tests
+
+注意：
+
+- 不要从已有 primitive 推断可以进入 `personal-production`。
+- 不要把 `upstream-full` 能力当作生产默认能力。
+- Tool surface 变化必须更新精确注册测试。
+
+### 修改 `create_task`
+
+先阅读：
+
+- `docs/PROJECT_STATUS.md`
+- `docs/architecture/decisions/ADR-006-controlled-create-task-v1.md` + accepted amendments
+- `docs/design/create-task/README.md`
+- `src/tools/definitions/createTask.ts`
+- `src/domain/taskCreation/`
+- Ledger / idempotency 相关测试
+- verifier / readback verification 相关测试
+- protocol / registration schema tests
+
+注意：
+
+- 保持 strict schema。
+- 保持 feature gates、Ledger、mutation lock、exact readback verification。
+- 保持 `mayHaveWritten`、`retrySafe`、fail-closed 和 replay 语义。
+- 不引入 generic mutation executor。
+
+### 修改生产能力边界
+
+先阅读：
+
+- `docs/PROJECT_STATUS.md`
+- `docs/SOURCE_MAP.md`
+- 相关 ADR
+- 相关 design / acceptance docs
+- `src/serverRegistration.ts`
+- `src/serverRegistration.test.ts`
+
+注意：
+
+- 生产能力变化必须能被代码、测试和当前状态文档共同证明。
+- 不要只更新说明文档而不更新 registration tests。
+- 不要只依赖客户端指令形成安全边界。
+
+### 修改运行时部署或运维流程
+
+先阅读：
+
+- Tunnel / LaunchAgent 运维文档
+- 相关 acceptance docs
+- 当前 runtime 检查结果
+
+注意：
+
+- 运行时状态可能与仓库代码不同。
+- 涉及真实 OmniFocus canary、生产 flag、LaunchAgent 或 Tunnel 修改时，必须单独获得明确授权。
+
+### 修改 Domain read 语义
+
+先阅读：
+
+- 相关 ADR
+- `docs/DEVELOPMENT.md`
+- 对应 `src/domain/**`
+- 对应 Tool definition
+- adapter / mapper / schema / composer tests
+
+注意：
+
+- 不要让 MCP handler 承担核心业务语义。
+- 不要因为输出缺字段而直接暴露 generic raw query。
+- direct / effective / source 语义必须保持可测试。
+
+## 当前关键事实摘要
+
+截至 `docs/PROJECT_STATUS.md` 记录日期：
+
+- `personal-production` 是当前生产 Profile。
+- `personal-production` 当前暴露五个 read tools。
+- `personal-production` 当前暴露一个 mutation tool：`create_task`。
+- `create_task` is the only mutation capability exposed by `personal-production`.
+- `create_task` 支持在创建阶段写入 task note。
+- `personal-production` 当前不暴露 Resources。
+- `upstream-full` 保留更宽的 upstream-compatible surface，但必须显式选择。
+- Phase 4 Parent Task placement production enablement 已记录为完成。
+- Parent placement 完成不授权 generic CRUD、名称解析、模糊匹配、fallback、edit、move、complete、delete、batch、repeat 或 notifications。
+
+## 常见漂移风险
+
+- ADR-006 同时包含 V1 历史设计和后续 amendment，不能只读旧段落判断当前能力。
+- Phase design 文档可能记录的是当时阶段边界，不一定代表当前生产状态。
+- 运行时 flag、Tunnel、LaunchAgent 状态可能不同于仓库代码，涉及生产状态时必须实时验证。
+- `upstream-full` 中存在 mutation tools，但不能推断为 `personal-production` 能力。
+- `search_tags` 返回的是发现事实，不是长期 mutation token。
+- `create_task` 的目标和 Tag 必须在 mutation 前重新验证，不能依赖旧聊天、缓存或历史截图。
+
+## 更新规则
+
+以下情况需要更新本文件：
+
+- 新增或替换某类问题的权威来源
+- Tool / Resource / Profile 边界变化
+- 某个旧文档被明确 supersede
+- `docs/PROJECT_STATUS.md` 的结构或职责变化
+- 未来 `AGENTS.md` 引入新的必读顺序
+
+保持本文件短小。详细证据应放在 ADR、设计文档、验收记录和工程日志中。
